@@ -1,3 +1,24 @@
+## Hán Ngữ Phiêu Lưu · HSK 1
+
+Game học tiếng Trung bằng tiếng Việt với 300 mục từ HSK 1, các chặng phiêu lưu, luyện Pinyin, ghép câu, đọc hiểu và ôn tập ngắt quãng.
+
+- [Mở trò chơi trên GitHub Pages](https://lnmcode.github.io/learning/hsk1/) sau khi workflow `Deploy GitHub Pages` chạy thành công.
+- Trên iPhone, mở link trong Safari. Để thêm biểu tượng vào màn hình chính, chọn **Chia sẻ → Thêm vào MH chính**. Mở game một lần khi có mạng và kiểm tra trạng thái ngoại tuyến trong **Cài đặt** trước khi ngắt mạng.
+- Để mang tiến độ từ bản ZIP sang website hoặc đổi thiết bị, mở **Cài đặt → Sao lưu** trong bản cũ và lưu tệp JSON. Sau đó mở **Khôi phục** trong bản mới, chọn tệp và xác nhận thay thế. Hai bản có vùng lưu trữ trình duyệt riêng.
+
+### Chạy trên máy tính
+
+Từ thư mục gốc của repo, chạy các lệnh sau với Node.js 24 và Python 3.
+
+```sh
+node --test tests/hsk1/*.test.cjs
+python3 -m http.server 8975 --bind 127.0.0.1
+```
+
+Mở [bản kiểm tra cục bộ](http://127.0.0.1:8975/learning/hsk1/). Đọc [hướng dẫn triển khai](DEPLOY.md), [khảo sát bản ZIP](PROJECT_AUDIT.md) và [đối chiếu nội dung](CONTENT_VALIDATION.md).
+
+---
+
 <!--
 **LNMCode/LNMCode** is a ✨ _special_ ✨ repository because its `README.md` (this file) appears on your GitHub profile.
 
