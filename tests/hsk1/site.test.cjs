@@ -14,7 +14,7 @@ const arcade = ['catalog.js', 'visual.js', 'strokes.js', 'strokes-data.js', 'pin
   'pairs.js', 'flow.js', 'arcade.css', 'memory-games.css', 'vendor/three.module.min.js',
   'vendor/three.core.min.js', 'wind.js', 'echo.js', 'riddle.js', 'lights.js',
   'wind.css', 'echo.css', 'riddle.css', 'lights.css', 'cinema.css',
-  'cinema-scenes.js'].map(name => './arcade/' + name);
+  'cinema-scenes.js', 'story-world.js', 'game-sets.js'].map(name => './arcade/' + name);
 
 function localResource(base, reference) {
   const url = new URL(reference, base);

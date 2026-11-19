@@ -6,7 +6,7 @@ Mở **Sân chơi** để luyện Pinyin với **Sao Pinyin**, luyện thứ t�
 
 Bốn trò khác gồm **Đường Gió** (đổi làn, tìm cổng đúng và bay lại với từ hay nhầm), **Trạm Vọng Âm** (dò sóng, nghe tiếng Quan thoại rồi ghi Pinyin), **Mật Mã Âm Tiết** (mở khóa bằng âm đầu, vần và thanh) và **Hồ Đom Đóm** (nhớ hai chữ theo thứ tự, có chế độ đua giờ tùy chọn). Trạm Vọng Âm dùng giọng của thiết bị; khi giọng Quan thoại không khả dụng, trò chuyển sang manh mối bằng nghĩa tiếng Việt.
 
-Cảnh đèn lồng và tám trò dùng chung hiệu ứng Three.js. Có thể bật **Giảm chuyển động** trong cài đặt. Trên màn hình cảm ứng, thao tác chụm hai ngón vẫn dùng để phóng to.
+Trong **Sân chơi**, chọn một trạm để máy quay đi theo Cáo Đèn, hoặc chọn **Dạo một vòng** để xem đủ tám trạm. Mỗi trò có mô hình Three.js phản ứng theo thao tác. Có thể bật **Giảm chuyển động** trong cài đặt. Trên màn hình cảm ứng, thao tác chụm hai ngón vẫn dùng để phóng to.
 
 - [Mở trò chơi trên GitHub Pages](https://lnmcode.github.io/learning/hsk1/) sau khi workflow `Deploy GitHub Pages` chạy thành công.
 - Trên iPhone, mở link trong Safari. Để thêm biểu tượng vào màn hình chính, chọn **Chia sẻ → Thêm vào MH chính**. Mở game một lần khi có mạng và kiểm tra trạng thái ngoại tuyến trong **Cài đặt** trước khi ngắt mạng.

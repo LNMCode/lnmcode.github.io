@@ -11,20 +11,25 @@
     const options = {signal: listeners.signal};
     root.innerHTML = `
       <section class="echo-game${ctx.lowMotion ? ' echo-game--still' : ''}" aria-label="Trạm Vọng Âm" data-echo-station>
+        <div class="echo-route" role="group" aria-label="Tiến độ nhận tin">
+          <p data-echo-count></p><div data-echo-chain></div>
+        </div>
         <div class="echo-radio" data-signal="0">
           <div class="echo-radio-head">
             <span class="echo-dial-value"><strong data-echo-frequency-value></strong> MHz</span>
             <span class="echo-lamp" data-echo-lock>Đang tìm sóng</span>
           </div>
-          <div class="echo-scope" data-cinema-stage aria-hidden="true">
-            ${bars.map((height, index) => `<i style="--bar:${height}%;--beat:${(index % 7) * -.11}s"></i>`).join('')}
+          <div class="echo-screen">
+            <aside class="echo-speaker" aria-hidden="true"></aside>
+            <div class="echo-scope" data-cinema-stage aria-hidden="true">
+              ${bars.map((height, index) => `<i style="--bar:${height}%;--beat:${(index % 7) * -.11}s"></i>`).join('')}
+              <b class="echo-sweep"></b>
+            </div>
+            <button type="button" class="echo-knob" data-echo-knob aria-label="Xoay sang tần số tiếp theo"><i aria-hidden="true"></i></button>
           </div>
           <div class="echo-bands" role="group" aria-label="Chọn tần số">
             ${frequencies.map((frequency, index) => `<button type="button" data-echo-frequency="${index}" aria-label="${frequency} MHz" aria-pressed="false">${frequency}</button>`).join('')}
           </div>
-        </div>
-        <div class="echo-route" role="group" aria-label="Tiến độ nhận tin">
-          <p data-echo-count></p><div data-echo-chain></div>
         </div>
         <p class="echo-instruction" data-echo-status role="status" aria-live="polite"></p>
         <div class="echo-actions" data-echo-actions hidden>
@@ -46,7 +51,7 @@
           <button type="button" class="btn button-text" data-echo-skip>Xem lời giải</button>
         </form>
         <div class="echo-answer" data-echo-answer hidden>
-          <div><strong lang="zh-Hans" data-echo-hanzi></strong><span data-echo-reading></span></div>
+          <div><strong lang="zh-Hans" data-echo-hanzi></strong><span data-echo-reading></span><b data-echo-gain aria-hidden="true"></b></div>
           <p data-echo-translation></p>
           <button type="button" class="btn primary full" data-echo-next>Nhận tin tiếp</button>
         </div>
@@ -61,6 +66,7 @@
     const radio = root.querySelector('.echo-radio');
     const spectrum = radio.querySelector('.echo-scope');
     const bandButtons = [...root.querySelectorAll('[data-echo-frequency]')];
+    const knob = get('knob');
     const audio = get('audio');
     const input = get('input');
     const status = get('status');
@@ -114,8 +120,10 @@
       const distance = Math.abs(dial - frequency);
       radio.dataset.signal = distance === 0 ? '3' : distance === 1 ? '2' : '1';
       spectrum.dataset.signal = radio.dataset.signal;
+      radio.style.setProperty('--echo-tuning', `${(dial - 2) * 34}deg`);
       get('frequency-value').textContent = frequencies[dial];
       get('lock').textContent = distance === 0 ? 'Đã bắt sóng' : distance === 1 ? 'Sóng gần' : 'Sóng yếu';
+      knob.setAttribute('aria-disabled', String(tuned));
       bandButtons.forEach((button, band) => {
         button.setAttribute('aria-pressed', String(band === dial));
         button.setAttribute('aria-disabled', String(tuned));
@@ -150,12 +158,14 @@
       frequency = candidates[Math.floor(Math.random() * candidates.length)];
       dial = frequency === 0 ? frequencies.length - 1 : 0;
       tuned = heard = hinted = missed = false;
+      radio.dataset.phase = '';
       input.value = '';
       audio.textContent = 'Nghe tín hiệu';
       audio.disabled = !ctx.voiceAvailable?.();
       get('hint').hidden = false;
       for (const name of ['actions', 'clue', 'form', 'answer']) get(name).hidden = true;
       refreshDial();
+      ctx.motion?.('round', spectrum, {signal: Number(radio.dataset.signal), band: dial});
       drawRoute();
       prompt('Thử các tần số cho đến khi đèn chuyển xanh để nhận tín hiệu.');
     }
@@ -201,21 +211,24 @@
     function reveal(correct) {
       const word = words[index];
       const unassisted = heard && !hinted;
+      const points = correct ? unassisted && !missed ? 100 : 55 : 0;
       if (unassisted) ctx.grade(word.id, 'reading', correct ? missed ? 'almost' : 'good' : 'again');
       if (correct) {
         decoded++;
         if (unassisted) byEar++;
-        score += unassisted && !missed ? 100 : 55;
+        score += points;
       }
+      radio.dataset.phase = correct ? 'linked' : 'recovered';
       states[index] = correct ? 'linked' : 'recovered';
       drawRoute();
-      ctx.motion?.(correct ? 'success' : 'miss', spectrum);
+      ctx.motion?.(correct ? 'success' : 'miss', spectrum, {score, signal:3, band:dial});
       get('actions').hidden = true;
       get('clue').hidden = true;
       get('form').hidden = true;
       get('answer').hidden = false;
       get('hanzi').textContent = word.hanzi;
       get('reading').textContent = word.pinyin;
+      get('gain').textContent = points ? `+${points}` : '';
       get('translation').textContent = word.vi;
       get('next').textContent = index + 1 === words.length ? 'Xem kết quả' : 'Nhận tin tiếp';
       prompt(correct ? 'Giải mã thành công. Một đèn tiếp sóng vừa sáng.' : 'Đã lưu cách đọc đúng để bạn xem lại.');
@@ -277,6 +290,7 @@
     input.addEventListener('compositionend', () => { composing = false; }, options);
     audio.addEventListener('click', listen, options);
     get('hint').addEventListener('click', () => showClue(false), options);
+    knob.addEventListener('click', () => chooseFrequency((dial + 1) % frequencies.length), options);
     get('skip').addEventListener('click', () => reveal(false), options);
     get('next').addEventListener('click', advance, options);
     get('replay').addEventListener('click', () => {

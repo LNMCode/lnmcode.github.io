@@ -25,17 +25,21 @@
     }
 
     root.innerHTML = `
-      <section class="lights-game" aria-label="Hồ Đom Đóm">
-        <p class="lights-rule">Đọc hai nghĩa, rồi chạm đúng chữ theo thứ tự để nối đường qua hồ.</p>
+      <section class="lights-game${ctx.lowMotion ? ' lights-still' : ''}" aria-label="Hồ Đom Đóm">
+        <div class="lights-hud"><strong data-lights-crossing></strong><span data-lights-score></span></div>
         <div class="lights-toolbar">
           <button type="button" class="btn button-soft" data-lights-mode aria-pressed="false">Bật đua giờ</button>
           <button type="button" class="btn button-white" data-lights-pause hidden>Tạm dừng</button>
         </div>
-        <div class="lights-hud"><strong data-lights-crossing></strong><span data-lights-score></span></div>
         <ol class="lights-clues" aria-label="Thứ tự các nghĩa cần tìm"></ol>
         <div class="lights-lake" data-lights-lake data-cinema-stage>
-          <div class="lights-path" aria-hidden="true" hidden></div>
+          <div class="lights-shore" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+          <div class="lights-path" aria-hidden="true" hidden>
+            <i class="lights-link"></i>${Array.from({length:5}, () => '<b></b>').join('')}
+          </div>
+          <div class="lights-traveler" aria-hidden="true"><i></i><b></b></div>
           <div class="lights-pads" aria-label="Chữ trên hồ"></div>
+          <b class="lights-gain" aria-hidden="true"></b>
         </div>
         <progress class="lights-timer" max="${beatDuration}" value="${beatDuration}" aria-label="Thời gian còn lại" hidden></progress>
         <p class="lights-status" data-lights-status role="status"></p>
@@ -50,6 +54,10 @@
     const board = game.querySelector('.lights-pads');
     const lake = game.querySelector('.lights-lake');
     const path = lake.querySelector('.lights-path');
+    const link = path.querySelector('.lights-link');
+    const bridge = [...path.querySelectorAll('b')];
+    const traveler = lake.querySelector('.lights-traveler');
+    const gain = lake.querySelector('.lights-gain');
     const clues = game.querySelector('.lights-clues');
     const status = game.querySelector('[data-lights-status]');
     const progress = game.querySelector('.lights-timer');
@@ -128,7 +136,12 @@
       hint.disabled = false;
       pause.disabled = false;
       lake.removeAttribute('data-cleared');
+      lake.removeAttribute('data-traveling');
+      lake.removeAttribute('data-collected');
       path.hidden = true;
+      gain.textContent = '';
+      traveler.style.setProperty('--x', '11%');
+      traveler.style.setProperty('--y', '92%');
       board.replaceChildren(...pads.map((word, index) => {
         const [x, y] = positions[index];
         const button = document.createElement('button');
@@ -141,13 +154,17 @@
         const label = document.createElement('span');
         label.lang = 'zh-Hans';
         label.textContent = word.hanzi;
+        const ripple = document.createElement('i');
+        ripple.setAttribute('aria-hidden', 'true');
+        button.append(ripple);
         button.append(label);
         records.set(word.id, {button, x, y});
         return button;
       }));
       hud();
       paintClues();
-      say('Tìm chữ ứng với nghĩa đầu tiên.');
+      say('Chạm chữ khớp với từng nghĩa để nối cầu qua hồ.');
+      ctx.motion?.('round', lake, {round});
       syncTimer();
     }
 
@@ -191,10 +208,16 @@
       const dx = to.x - from.x;
       const dy = to.y - from.y;
       const length = Math.hypot(dx, dy);
-      const normalX = .65 * dy / length;
-      const normalY = -.65 * dx / length;
+      const normalX = .62 * dy / length;
+      const normalY = -.62 * dx / length;
       const edge = (spot, side) => `${spot.x + side * normalX}% ${spot.y + side * normalY}%`;
-      path.style.clipPath = `polygon(${edge(from, 1)}, ${edge(to, 1)}, ${edge(to, -1)}, ${edge(from, -1)})`;
+      link.style.clipPath = `polygon(${edge(from, 1)}, ${edge(to, 1)}, ${edge(to, -1)}, ${edge(from, -1)})`;
+      bridge.forEach((plank, index) => {
+        const distance = (index + 1) / (bridge.length + 1);
+        plank.style.left = `${from.x + dx * distance}%`;
+        plank.style.top = `${from.y + dy * distance}%`;
+        plank.style.setProperty('--rise-delay', `${index * 42}ms`);
+      });
       path.hidden = false;
     }
 
@@ -206,6 +229,10 @@
         if (!misses.has(word.id) && !assisted.has(word.id)) ctx.grade(word.id, 'hanzi', 'again');
         misses.add(word.id);
         streak = 0;
+        if (!ctx.lowMotion) spot.button.animate?.(
+          [{filter:'brightness(1)'}, {filter:'brightness(1.55) saturate(.55)'}, {filter:'brightness(1)'}],
+          {duration:320}
+        );
         ctx.motion?.('miss', spot.button);
         hud();
         say(`Chưa tới chữ này. Hãy tìm chữ mang nghĩa “${word.vi}”.`, 'miss');
@@ -213,12 +240,20 @@
       }
       const clean = !assisted.has(id) && !misses.has(id);
       streak = clean ? streak + 1 : 0;
-      points += clean ? 100 + Math.min(streak - 1, 5) * 15 : 35;
+      const earned = clean ? 100 + Math.min(streak - 1, 5) * 15 : 35;
+      points += earned;
       if (clean) ctx.grade(id, 'hanzi', 'good');
       const previous = records.get(found.at(-1));
       found.push(id);
       if (previous) lightPath(previous, spot);
-      ctx.motion?.(previous ? 'connect' : 'success', spot.button, {from: previous?.button});
+      lake.dataset.traveling = '';
+      lake.dataset.collected = String(found.length);
+      traveler.style.setProperty('--x', `${spot.x}%`);
+      traveler.style.setProperty('--y', `${spot.y}%`);
+      gain.style.setProperty('--x', `${spot.x}%`);
+      gain.style.setProperty('--y', `${spot.y}%`);
+      gain.textContent = `+${earned}`;
+      ctx.motion?.(previous ? 'connect' : 'success', spot.button, {from: previous?.button, index:found.length - 1});
       spot.button.classList.remove('is-hinted');
       spot.button.classList.add('is-lit');
       spot.button.disabled = true;

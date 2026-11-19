@@ -1,9 +1,9 @@
 .riddle-game {
   display: grid;
   gap: 12px;
-  --riddle-gold: #ffd58f;
-  --riddle-teal: #a5f1d7;
-  --riddle-rose: #ffc5a5;
+  --riddle-gold: #ffda93;
+  --riddle-teal: #aff3d7;
+  --riddle-rose: #ffc4ab;
 }
 
 .riddle-game [hidden] { display: none !important; }
@@ -12,187 +12,278 @@
   display: flex;
   justify-content: space-between;
   gap: 10px;
-  color: var(--muted);
-  font-size: .86rem;
+  color: #e5d4bf;
+  font-size: .94rem;
 }
 
-.riddle-hud b { color: var(--riddle-gold); }
+.riddle-hud b { color: var(--riddle-gold); font-variant-numeric: tabular-nums; }
 
 .riddle-vault {
   position: relative;
   isolation: isolate;
   display: grid;
   place-items: center;
-  gap: 13px;
+  gap: 12px;
   min-height: 204px;
-  padding: 14px;
+  padding: 18px 12px 12px;
   overflow: hidden;
-  border: 1px solid #796145;
-  border-radius: 22px;
-  background:
-    linear-gradient(116deg, #26202a8a, #121d28a3),
-    repeating-linear-gradient(132deg, #172839 0 9px, #142333 9px 18px);
+  border: 1px solid #ac795c;
+  border-radius: 19px;
+  background: radial-gradient(ellipse at 50% 42%, #b65d4f, #493240 65%, #171e2b);
+  box-shadow: 0 6px #241d2b, 0 10px 20px #080a14c8, inset 0 1px #ffeea65a;
 }
 
-.riddle-vault::before,
 .riddle-vault::after {
   position: absolute;
-  z-index: -1;
-  inset: 10px;
+  z-index: -2;
+  inset: 0;
+  background:
+    repeating-radial-gradient(circle at 50% 49%, #fdd89123 0 1px, transparent 2px 22px),
+    radial-gradient(ellipse at 50% 50%, #ffad5869, transparent 77%);
+  opacity: .25;
   content: '';
+  pointer-events: none;
+  transition: opacity .28s ease-out;
+}
+.riddle-vault.is-open::after { opacity: 1; }
+
+.riddle-shutters {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  overflow: hidden;
   pointer-events: none;
 }
 
-.riddle-vault::before {
-  border: 1px solid #9b795d65;
-  border-radius: 14px;
+.riddle-shutters i {
+  position: relative;
+  border: 1px solid #83614f;
+  background:
+    linear-gradient(135deg, #735446e0, #34262cfa 71%),
+    repeating-linear-gradient(135deg, #523b37 0 7px, #5d433d 7px 14px);
+  box-shadow: inset -4px 0 #d4a68560, inset 0 0 20px #221e2c;
+  transition: transform .65s cubic-bezier(.23,.77,.27,1);
 }
 
-.riddle-vault::after {
-  inset: 0;
-  background: radial-gradient(ellipse at 50% 50%, #ffbc7952, transparent 68%);
-  opacity: 0;
-  transition: opacity .22s ease-out;
+.riddle-shutters i:last-child { box-shadow: inset 4px 0 #d4a68560, inset 0 0 20px #221e2c; }
+
+.riddle-shutters i::after {
+  position: absolute;
+  inset: 13px;
+  border: 1px solid #ffb68e55;
+  border-radius: 10px;
+  box-shadow: inset 0 1px #ffd6a432;
+  content: '';
 }
 
-.riddle-vault.is-open::after { opacity: 1; }
+.riddle-vault.is-open .riddle-shutters i:first-child { transform: translateX(-69%); }
+.riddle-vault.is-open .riddle-shutters i:last-child { transform: translateX(69%); }
 
 .riddle-plate {
   position: relative;
   display: grid;
   place-items: center;
-  width: 150px;
+  width: clamp(145px, 48vw, 194px);
   aspect-ratio: 1;
   border-radius: 50%;
-  background: radial-gradient(circle, #9d765935, #111d26 67%);
-  box-shadow: 0 0 26px #10141c, inset 0 0 4px #b68961a0;
+  border: 3px solid #956449;
+  background: radial-gradient(circle at 50% 42%, #805347, #2d232b 70%);
+  box-shadow: 0 7px #392b2c, 0 14px 20px #25141dcc, 0 0 0 2px #d6a77666, inset 0 0 20px #231c25;
 }
 
 .riddle-ring {
   position: absolute;
-  inset: 0;
-  border: 1px solid #a67b55;
+  inset: 4px;
+  border: 2px solid #e3a964;
   border-radius: 50%;
-  background: repeating-conic-gradient(from 16deg, #ac825965 0deg 1deg, transparent 1deg 15deg);
-  -webkit-mask: radial-gradient(farthest-side, transparent 83%, #000 84%);
-  mask: radial-gradient(farthest-side, transparent 83%, #000 84%);
-  transition: transform .24s ease-out, filter .2s;
+  background: repeating-conic-gradient(from 16deg, #ffca8e 0 1.4deg, #6b4a3b 2.3deg 4deg, transparent 4deg 15deg);
+  -webkit-mask: radial-gradient(farthest-side, transparent 84%, #000 85%);
+  mask: radial-gradient(farthest-side, transparent 84%, #000 85%);
+  transition: transform .34s cubic-bezier(.19,.82,.29,1.24), filter .28s;
+}
+
+.riddle-ring::after {
+  position: absolute;
+  inset: -1px 45% 81%;
+  border-radius: 3px;
+  background: #ffeb98;
+  box-shadow: 0 0 8px #ffc878;
+  content: '';
 }
 
 .riddle-ring-outer { transform: rotate(var(--riddle-onset-angle, 0deg)); }
-.riddle-ring-middle { inset: 13px; transform: rotate(var(--riddle-rime-angle, 0deg)); }
-.riddle-ring-inner { inset: 26px; transform: rotate(var(--riddle-tone-angle, 0deg)); }
-.riddle-vault.is-open .riddle-ring { filter: brightness(1.65); }
+.riddle-ring-middle {
+  inset: 11%;
+  transform: rotate(calc(-1 * var(--riddle-rime-angle, 0deg)));
+  border-color: #a683d0;
+  background: repeating-conic-gradient(#dac2e3 0 2deg, transparent 2deg 15deg);
+}
+.riddle-ring-inner {
+  inset: 20%;
+  transform: rotate(var(--riddle-tone-angle, 0deg));
+  border-color: #a7cbb2;
+  background: repeating-conic-gradient(#9df3d0 0 2deg, transparent 2deg 15deg);
+}
+.riddle-vault.is-open .riddle-ring { filter: brightness(1.56); }
 
 .riddle-seal {
+  z-index: 1;
   display: grid;
   place-items: center;
-  width: 69px;
+  width: 53%;
   aspect-ratio: 1;
-  border: 1px solid #b3885b;
+  border: 2px solid #f1b478;
   border-radius: 50%;
-  color: var(--riddle-gold);
-  background: #302520;
-  font-size: 2.4rem;
-  font-weight: 700;
+  color: #ffe9bb;
+  background: radial-gradient(circle at 38% 32%, #996246, #5b3936 77%);
+  font-family: var(--zh);
+  font-size: clamp(2.1rem, 10vw, 3rem);
+  font-weight: 800;
   line-height: 1;
-  box-shadow: inset 0 0 18px #e89f3550;
+  box-shadow: 0 3px #3c2729, inset 0 0 13px #ffb97a62;
 }
 
 .riddle-vault.is-open .riddle-seal {
-  color: #3a240a;
-  background: var(--riddle-gold);
-  box-shadow: 0 0 24px #ffb96db8;
-  animation: riddle-unlock .45s ease-out both;
+  color: #482621;
+  background: radial-gradient(circle at 40% 41%, #fff8be, #ffba71);
+  box-shadow: 0 0 30px #ffbe69, 0 3px #875e40;
+  animation: riddle-unlock .55s cubic-bezier(.18,.73,.28,1.12) both;
 }
 
-@keyframes riddle-unlock {
-  0% { transform: scale(.92); }
-  38% { transform: scale(1.16); }
-  100% { transform: scale(1); }
+.riddle-gain {
+  position: absolute;
+  top: 12%;
+  right: 6%;
+  color: #fff0a8;
+  font-size: clamp(1.1rem, 5vw, 1.75rem);
+  line-height: 1;
+  text-shadow: 0 2px #854729, 0 0 18px #ffd07e;
 }
+
+.riddle-vault.is-open .riddle-gain { animation: riddle-gain .55s .12s cubic-bezier(.18,.73,.28,1.12) both; }
+
+@keyframes riddle-unlock { from { transform: scale(.9); } to { transform: scale(1.03); } }
+@keyframes riddle-gain { from { transform: translateY(10px) scale(.65); opacity: 0; } to { transform: none; opacity: 1; } }
 
 .riddle-lamps {
   display: flex;
-  gap: 8px;
-  padding: 0;
-  margin: 0;
+  gap: 10px;
+  margin: 1px 0 0;
+  padding: 5px 13px;
   list-style: none;
+  border-style: solid;
+  border-color: #b07c5857 #b07c5857 #fee2ae34;
+  border-width: 1px;
+  border-radius: 20px;
+  background: #211b29b0;
+  box-shadow: inset 0 2px #140e19;
 }
 
 .riddle-lamps li {
-  width: 9px;
+  width: 10px;
   height: 9px;
-  border: 1px solid #ae8d6a;
-  border-radius: 50%;
-  background: #3e2c23;
+  border: 1px solid #c69168;
+  border-radius: 3px 3px 5px 5px;
+  background: #4e3937;
+  box-shadow: 0 1px #110e1c;
 }
-
 .riddle-lamps .is-lit {
-  border-color: var(--riddle-gold);
+  border-color: #ffedbb;
   background: var(--riddle-gold);
-  box-shadow: 0 0 7px #e9aa56;
+  box-shadow: 0 0 10px #f4b86f;
 }
 
 .riddle-clue {
   display: grid;
   gap: 3px;
-  padding: 11px 13px;
-  border-left: 3px solid #d6a562;
-  border-radius: 8px;
-  background: #392a2859;
+  padding: 10px 12px;
+  border-left: 3px solid #dda476;
+  border-radius: 5px 11px 11px 5px;
+  background: linear-gradient(110deg, #4d3433, #242631);
 }
-
-.riddle-clue small { color: var(--riddle-gold); }
-.riddle-clue strong { font-size: 1.02rem; overflow-wrap: anywhere; }
+.riddle-clue small { color: var(--riddle-gold); font-size: .88rem; }
+.riddle-clue strong { color: #ffead8; font-size: 1.13rem; overflow-wrap: anywhere; }
 
 .riddle-form { display: grid; gap: 10px; }
-.riddle-form > p { color: var(--muted); font-size: .86rem; }
+.riddle-form > p { color: #cdc2c8; font-size: .92rem; }
 .riddle-dials { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 
-.riddle-dials label {
+.riddle-dial {
   display: grid;
-  grid-template-rows: auto auto 1fr;
+  grid-template-rows: auto auto auto 1fr;
   align-items: start;
-  gap: 4px;
+  gap: 5px;
   min-width: 0;
-  padding: 6px;
-  border: 1px solid #3a4d61;
-  border-radius: 10px;
-  color: #dce3ea;
-  background: #142334;
-  font-size: .78rem;
+  padding: 7px 5px 6px;
+  border: 1px solid #83644f;
+  border-radius: 11px;
+  color: #f7ddbd;
+  background: linear-gradient(145deg, #513e3a, #2e2932);
+  box-shadow: 0 3px #181c2a, inset 0 1px #e9ac7a2c;
+  font-size: .87rem;
+  text-align: center;
 }
+.riddle-dial label { line-height: 1.3; }
 
 .riddle-dials select {
   width: 100%;
   min-height: 44px;
-  padding: 5px 2px;
-  border: 1px solid #597087;
+  min-width: 0;
+  padding: 5px 12px 5px 2px;
+  appearance: none;
+  text-align: center;
+  border: 1px solid #d0a077;
   border-radius: 7px;
-  color: #fff2d1;
-  background: #1e2e3c;
+  color: #fff1d0;
+  background:
+    linear-gradient(55deg, transparent 50%, #e8b78e 50%) right 7px center/4px 5px no-repeat,
+    linear-gradient(125deg, #e8b78e 50%, transparent 50%) right 3px center/4px 5px no-repeat,
+    linear-gradient(#302630, #45343a);
+  box-shadow: inset 0 2px #1819238c;
   font: inherit;
   font-size: 1rem;
-  font-weight: 700;
+  font-weight: 750;
 }
 
 .riddle-dials select:disabled { opacity: 1; }
 .riddle-dials select:focus-visible { outline: 2px solid var(--riddle-gold); outline-offset: 1px; }
-.riddle-dials [data-state="matched"] { border-color: #72b69f; color: var(--riddle-teal); }
-.riddle-dials [data-state="missed"] { border-color: #b78072; color: var(--riddle-rose); }
-.riddle-dials [data-state="hint"] { border-color: #c29e64; color: var(--riddle-gold); }
-.riddle-dial-status { min-height: 1.27em; }
+.riddle-dial-turn { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.riddle-dial-turn button {
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 3px 2px;
+  border: 1px solid #b67e5e;
+  border-radius: 7px;
+  color: #ffe0a9;
+  background: linear-gradient(#956550, #614437);
+  box-shadow: 0 2px #33262b, inset 0 1px #ffbc9a40;
+  font: 750 1.5rem/1 system-ui;
+}
+.riddle-dial-turn button:active { transform: translateY(1px); }
+.riddle-dials [data-state="matched"] { border-color: #7cb399; color: var(--riddle-teal); }
+.riddle-dials [data-state="missed"] { border-color: #ce927d; color: var(--riddle-rose); }
+.riddle-dials [data-state="hint"] { border-color: #d0a673; color: var(--riddle-gold); }
+.riddle-dial-status { min-height: 1.21em; line-height: 1.22; }
+.riddle-dial-status:empty:not(:focus) { display: none; }
 .riddle-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
 .riddle-buttons .btn { flex: 1 1 130px; }
-.riddle-message { min-height: 1.4em; color: var(--riddle-gold); font-size: .91rem; }
+.riddle-message {
+  padding: 9px 12px;
+  border-left: 3px solid #db9b6d;
+  border-radius: 5px 11px 11px 5px;
+  color: var(--riddle-gold);
+  background: #382930;
+  font-size: .94rem;
+}
 .riddle-message:empty { display: none; }
 
-.riddle-still .riddle-ring,
-.riddle-still .riddle-vault::after { transition: none; }
-.riddle-still .riddle-seal { animation: none; }
-
+.riddle-still .riddle-vault::after,
+.riddle-still :is(.riddle-ring,.riddle-shutters i) { transition: none; }
+.riddle-still .riddle-vault.is-open :is(.riddle-gain,.riddle-seal) { animation: none; }
 @media (prefers-reduced-motion: reduce) {
-  .riddle-ring, .riddle-vault::after { transition: none; }
-  .riddle-vault.is-open .riddle-seal { animation: none; }
+  .riddle-vault::after,
+  .riddle-game :is(.riddle-ring,.riddle-shutters i) { transition: none; }
+  .riddle-vault.is-open :is(.riddle-gain,.riddle-seal) { animation: none; }
 }

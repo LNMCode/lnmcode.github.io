@@ -4,6 +4,7 @@
   const registry = window.HSK_MINIGAMES ||= {};
   const ROUND_COUNT = 5;
   const PARTS = ['onset', 'rime', 'tone'];
+  const PART_LABELS = {onset:'Phần đầu', rime:'Phần vần', tone:'Thanh điệu'};
   const EMPTY_ONSET = '∅';
   const TONES = ['', '\u0304', '\u0301', '\u030c', '\u0300'];
   const TONE_LABEL = ['','1 · ngang','2 · lên','3 · xuống lên','4 · xuống','5 · nhẹ'];
@@ -48,30 +49,29 @@
       <section class="riddle-game${ctx.lowMotion ? ' riddle-still' : ''}" data-riddle-riddle aria-label="Mật Mã Âm Tiết">
         <div class="riddle-hud"><span>Khóa <b data-riddle-round></b></span><span><b data-riddle-score>0</b> điểm</span></div>
         <div class="riddle-vault" data-riddle-lock data-cinema-stage>
+          <div class="riddle-shutters" aria-hidden="true"><i></i><i></i></div>
           <div class="riddle-plate">
             <div class="riddle-ring riddle-ring-outer" aria-hidden="true"></div>
             <div class="riddle-ring riddle-ring-middle" aria-hidden="true"></div>
             <div class="riddle-ring riddle-ring-inner" aria-hidden="true"></div>
             <div class="riddle-seal" data-riddle-word lang="zh-Hans"></div>
           </div>
+          <b class="riddle-gain" aria-hidden="true"></b>
           <ol class="riddle-lamps" aria-label="Dấu niêm đã mở"></ol>
         </div>
         <div class="riddle-clue"><small>Nghĩa của chữ</small><strong data-riddle-meaning></strong></div>
         <form class="riddle-form" data-riddle-form>
           <p>Chọn phần đầu, phần vần và thanh điệu theo cách viết Pinyin.</p>
           <div class="riddle-dials">
-            <label data-riddle-dial="onset">Phần đầu
-              <select data-riddle-part="onset" aria-describedby="riddle-onset-status"></select>
-              <span id="riddle-onset-status" class="riddle-dial-status"></span>
-            </label>
-            <label data-riddle-dial="rime">Phần vần
-              <select data-riddle-part="rime" aria-describedby="riddle-rime-status"></select>
-              <span id="riddle-rime-status" class="riddle-dial-status"></span>
-            </label>
-            <label data-riddle-dial="tone">Thanh điệu
-              <select data-riddle-part="tone" aria-describedby="riddle-tone-status"></select>
-              <span id="riddle-tone-status" class="riddle-dial-status"></span>
-            </label>
+            ${PARTS.map(part => `<div class="riddle-dial" data-riddle-dial="${part}">
+              <label for="riddle-${part}">${PART_LABELS[part]}</label>
+              <select id="riddle-${part}" data-riddle-part="${part}" aria-describedby="riddle-${part}-status"></select>
+              <div class="riddle-dial-turn">
+                <button type="button" data-riddle-turn="-1" aria-label="Lùi một nấc ở ${PART_LABELS[part].toLowerCase()}">‹</button>
+                <button type="button" data-riddle-turn="1" aria-label="Tiến một nấc ở ${PART_LABELS[part].toLowerCase()}">›</button>
+              </div>
+              <span id="riddle-${part}-status" class="riddle-dial-status"></span>
+            </div>`).join('')}
           </div>
           <div class="riddle-buttons">
             <button type="button" class="btn button-soft" data-riddle-hint>Gợi ý một vòng</button>
@@ -93,10 +93,12 @@
     const nextButton = game.querySelector('[data-riddle-next]');
     const replayButton = game.querySelector('[data-riddle-replay]');
     const reward = game.querySelector('.riddle-open-actions');
+    const gain = game.querySelector('.riddle-gain');
     const dials = Object.fromEntries(PARTS.map(part => [part, {
       field: game.querySelector(`[data-riddle-dial="${part}"]`),
       select: game.querySelector(`[data-riddle-part="${part}"]`),
       status: game.querySelector(`#riddle-${part}-status`),
+      buttons: [...game.querySelectorAll(`[data-riddle-dial="${part}"] [data-riddle-turn]`)],
     }]));
     let rounds = [];
     let index = 0;
@@ -118,11 +120,12 @@
     }
 
     function setDial(part, state) {
-      const {field, select, status} = dials[part];
+      const {field, select, status, buttons} = dials[part];
       field.dataset.state = state;
       select.disabled = state === 'matched' || state === 'hint';
+      buttons.forEach(button => { button.disabled = select.disabled; });
       status.textContent = {matched:'Đã khớp', missed:'Chưa khớp', hint:'Đã gợi ý'}[state] || '';
-      lock.style.setProperty(`--riddle-${part}-angle`, `${select.selectedIndex * 33}deg`);
+      lock.style.setProperty(`--riddle-${part}-angle`, `${select.selectedIndex * 42}deg`);
     }
 
     function showRound(shouldFocus) {
@@ -135,6 +138,7 @@
       mistakes = hints = 0;
       opened = false;
       lock.classList.remove('is-open');
+      gain.textContent = '';
       reward.hidden = true;
       form.hidden = false;
       hintButton.disabled = false;
@@ -153,6 +157,7 @@
         setDial(part, '');
       }
       updateScore();
+      ctx.motion?.('round', lock, {round: index});
       if (shouldFocus) dials.onset.select.focus();
     }
 
@@ -218,6 +223,7 @@
       const points = Math.max(30, 120 - mistakes * 16 - hints * 25);
       const final = index + 1 === rounds.length;
       score += points;
+      gain.textContent = `+${points}`;
       lock.classList.add('is-open');
       form.hidden = true;
       reward.hidden = false;
@@ -238,6 +244,20 @@
       ctx.motion?.('dial', lock, {part, value: event.target.selectedIndex});
     }
 
+    function turn(event) {
+      const button = event.target.closest('[data-riddle-turn]');
+      if (!button) return;
+      const part = button.closest('[data-riddle-dial]').dataset.riddleDial;
+      const {select} = dials[part];
+      const options = select.options.length - 1;
+      const direction = Number(button.dataset.riddleTurn);
+      let current = select.selectedIndex - 1;
+      if (current < 0) current = direction === 1 ? -1 : 0;
+      select.selectedIndex = 1 + (current + direction + options) % options;
+      setDial(part, '');
+      ctx.motion?.('dial', lock, {part, value: select.selectedIndex, direction});
+    }
+
     function nextRound() {
       if (!opened || index + 1 >= rounds.length) return;
       index++;
@@ -247,6 +267,7 @@
 
     form.addEventListener('submit', submit);
     form.addEventListener('change', change);
+    form.addEventListener('click', turn);
     hintButton.addEventListener('click', hint);
     nextButton.addEventListener('click', nextRound);
     replayButton.addEventListener('click', replay);
@@ -254,6 +275,7 @@
     return () => {
       form.removeEventListener('submit', submit);
       form.removeEventListener('change', change);
+      form.removeEventListener('click', turn);
       hintButton.removeEventListener('click', hint);
       nextButton.removeEventListener('click', nextRound);
       replayButton.removeEventListener('click', replay);

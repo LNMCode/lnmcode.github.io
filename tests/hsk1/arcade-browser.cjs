@@ -256,8 +256,20 @@ async function run() {
     if (webgl) await page.locator('#hsk-cinema[data-visual="3d"]').waitFor({state:'attached'});
     const lobby = () => page.getByRole('button', { name: 'Sân chơi', exact: true }).click();
     const enter = game => page.locator(`[data-action="arcade-start"][data-id="${game}"]`).click();
+    await page.getByRole('button', { name: 'Khám phá', exact: true }).click();
+    const regions = page.locator('#map-region option');
+    await page.locator('#map-region').selectOption(await regions.last().getAttribute('value'));
+    assert.equal(await canvas.getAttribute('data-focus'), String(await regions.count() - 1));
     await lobby();
     assert.equal(await page.locator('.arcade-card').count(), 8);
+    const station = page.locator('[data-action="arcade-preview"][data-id="flow"]');
+    await station.click();
+    assert.equal(await station.getAttribute('aria-pressed'), 'true');
+    assert.equal(await canvas.getAttribute('data-focus'), '7');
+    await page.locator('[data-feature-play]').click();
+    await page.locator('[data-cinema-cover][data-palette="flow"]').waitFor();
+    assert.equal(await canvas.getAttribute('data-scene'), 'flow');
+    await lobby();
     if (process.env.HSK_ARCADE_SCREENSHOTS) {
       await page.locator('.arcade-lobby').screenshot({path: process.env.HSK_ARCADE_SCREENSHOTS + '/hsk1-san-choi.png'});
     }
@@ -265,6 +277,7 @@ async function run() {
       await enter(name);
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
       assert.equal(await canvas.getAttribute('data-scene'), name);
+      assert.equal(await page.locator(`[data-cinema-cover][data-palette="${name}"]`).count(), 1);
       assert.equal(await page.locator('#app canvas').count(), 0);
       if (name === 'pinyin') {
         if (webgl) await page.locator('#hsk-cinema[data-visual="3d"]').waitFor({state:'attached'});

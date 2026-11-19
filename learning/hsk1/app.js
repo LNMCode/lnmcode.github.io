@@ -5,8 +5,11 @@ const app=document.getElementById('app');
 const arcade=window.HSK_ARCADE;
 const reduceMedia=matchMedia('(prefers-reduced-motion: reduce)');
 const cinema=window.HSK_CINEMA?.mount(document.getElementById('hsk-cinema'));
+const gameIds=Object.keys(arcade?.games||{});
 let state=E.load();
 let arcadeId=null, stopArcade=null;
+let arcadeFocus=0;
+let arcadeTour=null;
 let view='home', selectedRegion=null,wordTerm='',wordFilter='all',dictLimit=35,wordId=null,storyRegion=null,storyShowPinyin=false,storyRevealed={},reviewSkill='all',reviewCount=state.preferences.sessionSize,toaster=null;
 let renderedScene = '';
 const esc=s=>String(s??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -47,9 +50,14 @@ function bindCinemaScene() {
     ? '.adventure-board, .adventure-gate, .quest-screen .scene, .feedback-answer'
     : '[data-cinema-stage], .scene, .hero-hanzi, .card';
   const anchor = [...surface.querySelectorAll(stages)].find(element => element.getClientRects().length);
+  const cover = surface.querySelector('[data-cinema-cover]');
+  const region = selectedRegion || nextMission().regionId;
+  const regionIndex = D.regions.findIndex(item=>item.id===(scene==='play'?M[state.active?.missionId]?.regionId:region));
+  const quietFocus={review:4,words:5,reader:3,settings:0};
+  const focus = scene === 'arcade' ? arcadeFocus : quietFocus[scene] ?? Math.max(0,regionIndex);
   if (renderedScene !== scene && !lowMotion()) surface.classList.add('cinema-scene-entry');
   renderedScene = scene;
-  cinema?.setScene(scene, {lowMotion:lowMotion(), anchor});
+  cinema?.setScene(scene, {lowMotion:lowMotion(), anchor:anchor||cover, cover, focus});
 }
 
 function motion(type, target, detail) {
@@ -79,7 +87,15 @@ function scene(region,small=false) {
 function btn(action,text,style='primary',extra=''){return `<button type="button" class="btn ${style}" data-action="${esc(action)}" ${extra}>${text}</button>`;}
 function topbar(sub='HSK 1 · 300 từ'){return `<header class="topbar"><button class="brand" data-action="nav" data-view="home" aria-label="Về trang chủ"><span class="brand-mark">汉</span><span><strong>Hán Ngữ Phiêu Lưu</strong><small>${esc(sub)}</small></span></button><button class="round-button" data-action="nav" data-view="settings" aria-label="Cài đặt">${icon('settings')}</button></header>`;}
 function nav(active){return `<nav class="bottom-nav" aria-label="Điều hướng chính">${[['home','home','Trang chủ'],['map','map','Khám phá'],['arcade','spark','Sân chơi'],['review','repeat','Ôn tập'],['words','book','Từ điển']].map(([name,ico,lab])=>`<button class="nav-item ${active===name?'active':''}" data-action="nav" data-view="${name}" aria-label="${lab}"${active===name?' aria-current="page"':''}>${icon(ico)}<span>${lab}</span></button>`).join('')}</nav>`;}
-function frame(html,tab,sub){return `<main class="app-main">${topbar(sub)}${html}</main>${nav(tab)}`;}
+function cover(kind, glyph='', scenery='') {
+  return `<div class="film-stage film-stage-${esc(kind)}" data-cinema-cover data-palette="${esc(kind)}" data-art="${esc(scenery)}" aria-hidden="true">
+    <div class="film-fallback">${glyph?hanzi(glyph):''}<i></i><i></i><i></i></div>
+  </div>`;
+}
+function frame(html,tab,sub){
+  const quiet={words:['字','market'],reader:['读','river'],progress:['路','river'],settings:['灯','school']};
+  return `<main class="app-main page-${esc(view)}">${topbar(sub)}${quiet[view]?cover('quiet',...quiet[view]):''}${html}</main>${nav(tab)}`;
+}
 function pill(text,cls=''){return `<span class="pill ${cls}">${esc(text)}</span>`;}
 function progressBar(a,b,label='Tiến độ'){return `<div class="meter" role="progressbar" aria-label="${esc(label)}" aria-valuenow="${a}" aria-valuemin="0" aria-valuemax="${b}"><span style="width:${fmtPercent(a,b)}%"></span></div>`;}
 function nextMission(){return D.missions.find(m=>!state.completed.includes(m.id))||D.missions[D.missions.length-1];}
@@ -88,8 +104,17 @@ function home(){const st=E.stats(state),m=nextMission(),r=R[m.regionId],isActive
  const oldMission=state.active?.mode==='mission'&&state.active.queue[0]?.type!=='trail';
  const playAction=oldMission?'switch-to-trail':isActive?'resume':'begin-next';
  const playLabel=oldMission?'Thử đường đèn mới':isActive?'Tiếp tục đang chơi':'Tiếp tục phiêu lưu';
- return frame(`<div class="hero"><div class="hero-body"><h1>Theo dấu đèn lồng</h1><p class="subtle">Tìm chữ Hán quanh mình, thắp đèn bằng trí nhớ rồi ghép lời nhắn để mở đường.</p><div class="hero-stats"><b>${st.seen}<span>/300 từ đã gặp</span></b><b>${st.quests}<span>/${st.totalQuests} chặng</span></b></div>${progressBar(st.seen,300,'Từ vựng đã gặp')}</div>${scene(r)}</div>
- <div class="top-buttons">${btn(playAction,`${icon('play')} ${playLabel}`)}${btn('nav',`${icon('repeat')} Ôn từ`, 'button-soft','data-view="review"')}</div>
+ return frame(`<section class="hero story-hero">
+   ${cover('home','灯',D.adventures?.[r.id]?.scene||'school')}
+   <div class="hero-body">
+     <p class="scene-location">${icon('map')} ${esc(r.name)}</p>
+     <h1>Theo dấu <em>đèn lồng</em></h1>
+     <p class="subtle">Cùng Cáo Đèn gặp chữ Hán, thắp sáng đường đêm và ghép lời nhắn để mở lối.</p>
+     <div class="hero-stats"><b>${st.seen}<span>/300 từ đã gặp</span></b><b>${st.quests}<span>/${st.totalQuests} chặng</span></b></div>
+     ${progressBar(st.seen,300,'Từ vựng đã gặp')}
+     <div class="top-buttons">${btn(playAction,`${icon('play')} ${playLabel}`)}${btn('nav',`${icon('repeat')} Ôn từ`, 'button-soft','data-view="review"')}</div>
+   </div>
+ </section>
  ${oldMission?btn('resume','Tiếp tục lượt đang dở','button-text full mt8'):''}
  ${arcade?`<button class="arcade-home-link" data-action="nav" data-view="arcade">
    <span class="arcade-home-icon" aria-hidden="true">${icon('spark')}</span><span><strong>Sân chơi đèn lồng</strong>
@@ -100,6 +125,9 @@ function home(){const st=E.stats(state),m=nextMission(),r=R[m.regionId],isActive
  `,'home');}
 
 function arcadeLobby() {
+  if(!gameIds.length) return frame('<h1>Sân chơi đèn lồng</h1><p>Sân chơi chưa tải được. Hãy tải lại trang.</p>','arcade');
+  const featuredId = gameIds[arcadeFocus];
+  const featured = arcade.games[featuredId];
   const cards = Object.entries(arcade?.games || {}).map(([id, game]) => {
     const result = state.arcade[id];
     return `<button type="button" class="arcade-card arcade-card-${id}" data-action="arcade-start" data-id="${id}">
@@ -110,19 +138,80 @@ function arcadeLobby() {
     </button>`;
   }).join('');
   return frame(`<section class="arcade-lobby">
-      <header class="arcade-lobby-title" data-cinema-stage><h1>Sân chơi đèn lồng</h1>
-        <p>Nghe, đọc, viết và vận dụng từ theo nhịp của bạn.</p></header>
+      <header class="arcade-lobby-title"><div><h1>Sân chơi <em>đèn lồng</em></h1>
+        <p>Thử sức với chữ Hán qua tám trạm.</p></div>
+        ${btn('arcade-tour',`${icon('play')} <span>Dạo một vòng</span>`,'button-soft',
+          'aria-pressed="false"'+(lowMotion()?' hidden':''))}
+      </header>
+      <section class="arcade-feature" aria-label="Khám phá các trạm">
+        ${cover(featuredId, featured.glyph, 'market')}
+        <div class="station-picker" role="group" aria-label="Chọn trạm để ngắm">
+          ${gameIds.map((id,index)=>`<button type="button" data-action="arcade-preview" data-id="${id}"
+            data-palette="${id}" aria-label="Ngắm trạm ${esc(arcade.games[id].name)}" aria-pressed="${index===arcadeFocus}">
+            ${hanzi(arcade.games[id].glyph)}
+          </button>`).join('')}
+        </div>
+        <div class="station-caption">
+          <div aria-live="polite"><strong data-station-name>${esc(featured.name)}</strong>
+            <span data-station-skill>${esc(featured.ability)}</span></div>
+          ${btn('arcade-feature-play',`${icon('play')} Chơi`,'primary','data-feature-play')}
+        </div>
+      </section>
+      <div class="section-title"><h2>Tất cả mini game</h2></div>
       <div class="arcade-grid">${cards||'<p>Sân chơi chưa tải được. Hãy tải lại trang.</p>'}</div>
     </section>`, 'arcade');
+}
+
+function arcadePreview(id) {
+  const index=gameIds.indexOf(id);
+  if(index===-1||index===arcadeFocus)return;
+  arcadeFocus=index;
+  const game=arcade.games[id];
+  const stage=app.querySelector('[data-cinema-cover]');
+  stage.dataset.palette=id;
+  stage.querySelector('.film-fallback .zh').textContent=game.glyph;
+  app.querySelector('[data-station-name]').textContent=game.name;
+  app.querySelector('[data-station-skill]').textContent=game.ability;
+  for(const button of app.querySelectorAll('[data-action="arcade-preview"]')) {
+    button.setAttribute('aria-pressed',String(button.dataset.id===id));
+  }
+  bindCinemaScene();
+}
+
+function stopTour() {
+  clearTimeout(arcadeTour);
+  arcadeTour=null;
+  const button=app.querySelector('[data-action="arcade-tour"]');
+  if(button) {
+    button.setAttribute('aria-pressed','false');
+    button.querySelector('span').textContent='Dạo một vòng';
+  }
+}
+
+function toggleTour(button) {
+  if(arcadeTour!==null){stopTour();return;}
+  if(lowMotion())return;
+  button.setAttribute('aria-pressed','true');
+  button.querySelector('span').textContent='Dừng';
+  arcadePreview(gameIds[0]);
+  let index=1;
+  function nextStation(){
+    if(view!=='arcade'||index===gameIds.length||document.hidden){stopTour();return;}
+    arcadePreview(gameIds[index++]);
+    arcadeTour=setTimeout(nextStation,1880);
+  }
+  arcadeTour=setTimeout(nextStation,1880);
 }
 
 function arcadeScreen() {
   const game = arcade.games[arcadeId];
   return `<main class="app-main arcade-main">
-    <header class="arcade-game-header">
+    <header class="arcade-game-header" data-palette="${arcadeId}">
       <button class="back-link" data-action="nav" data-view="arcade">${icon('left')} Sân chơi</button>
       <h1 tabindex="-1">${esc(game.name)}</h1>
+      <span class="game-skill">${esc(game.ability)}</span>
     </header>
+    ${cover(arcadeId,game.glyph,arcadeId==='lights'||arcadeId==='flow'?'river':'')}
     <div id="arcade-game"></div>
   </main>`;
 }
@@ -155,7 +244,13 @@ function mountArcade() {
   }
 }
 function mapView(){const st=E.stats(state);if(!selectedRegion)selectedRegion=nextMission().regionId;
- let out=`<div class="eyebrow">${icon('map')} BẢN ĐỒ HỌC TẬP</div><h1>${D.regions.length} vùng đất tiếng Trung</h1><p class="subtle mt8">${st.totalQuests} chặng nhỏ · ${st.total} từ. Các từ cũ vẫn quay lại trong nhiệm vụ mới.</p><div class="map-overview">${progressBar(st.quests,st.totalQuests,'Số chặng đã hoàn thành')}<span>${st.quests}/${st.totalQuests} chặng hoàn thành</span></div><div class="region-list">`;
+ let out=`<header class="chapter-title"><h1>Bản đồ <em>đèn lồng</em></h1><p class="subtle">${D.regions.length} vùng đất · ${st.totalQuests} chặng · ${st.total} từ</p></header>
+   ${cover('map','路',D.adventures?.[selectedRegion]?.scene||'market')}
+   <label class="map-picker" for="map-region">${icon('map')} <span>Điểm dừng</span>
+     <select class="select" id="map-region">${D.regions.map(r=>`<option value="${esc(r.id)}"
+       ${r.id===selectedRegion?'selected':''}>${esc(r.name)}</option>`).join('')}</select>
+   </label>
+   <div class="map-overview">${progressBar(st.quests,st.totalQuests,'Số chặng đã hoàn thành')}<span>${st.quests}/${st.totalQuests} chặng hoàn thành</span></div><div class="region-list">`;
  D.regions.forEach((r,idx)=>{const count=regionCompleted(r),open=r.id===selectedRegion;const firstUnfinished=nextMission(),unlocked=idx===0||D.regions.slice(0,idx).every(q=>q.missionIds.every(mid=>state.completed.includes(mid)))||r.missionIds.some(mid=>state.completed.includes(mid))||r.id===firstUnfinished.regionId;
   out+=`<div class="region-card ${open?'expanded':''} ${!unlocked?'region-upcoming':''}"><button class="region-head" data-action="region" data-id="${r.id}" aria-expanded="${open}"><span class="region-emoji">${r.emoji}</span><span class="region-desc"><small>VÙNG ${idx+1} · ${r.wordIds.length} TỪ</small><strong>${esc(r.name)}</strong><em>${count}/${r.missionIds.length} chặng · ${unlocked?'Có thể chơi':'Sắp mở khóa'}</em></span><span class="region-chevron">⌄</span></button>`;
   if(open){out+=scene(r,true)+`<p class="region-intro">${esc(D.adventures?.[r.id]?.objective||r.intro)}</p><div class="quest-list">`;r.missionIds.forEach(mid=>{const m=M[mid],done=state.completed.includes(mid),mx=D.missions.findIndex(x=>x.id===mid);const allowed=mx===0||done||state.completed.includes(D.missions[mx-1].id);out+=`<button class="quest-row" data-action="start-mission" data-id="${mid}" ${allowed?'':'disabled'}><span class="quest-dot ${done?'done':allowed?'available':'locked'}">${done?icon('check'):allowed?'✦':'•'}</span><span><strong>${esc(D.adventureMissions?.[mid]?.title||m.title)}</strong><small>${m.wordIds.map(wid=>W[wid].hanzi).join(' · ')}</small></span>${allowed?icon('arrow'):''}</button>`;});out+=`</div>`;}
@@ -165,6 +260,7 @@ function review(){
   const weak=E.dueItems(state,40).filter((item,index,all)=>all.findIndex(other=>other.id===item.id)===index).slice(0,6);
   return frame(`<div class="eyebrow">${icon('repeat')} ÔN TẬP THÔNG MINH</div>
     <h1>Ôn từ đã học</h1><p class="subtle mt8">Tập trung vào kỹ năng bạn dễ quên và chia những lượt đến hạn thành buổi ngắn.</p>
+    ${cover('quiet','记','school')}
     <div class="review-hero"><span class="review-emoji" aria-hidden="true">🧠</span><div><b>${st.due}</b><strong>lượt luyện đến hạn</strong></div></div>
     <div class="card"><h3>Chọn kỹ năng</h3>
       <div class="chip-wrap">${[['all','Tổng hợp'],...Object.entries(skillNames)].map(([id,label])=>
@@ -310,7 +406,7 @@ function adventureIntro(active) {
   const story = adventureFor(mission);
   return `<section class="quest-screen">
     <button class="back-link" data-action="quit">${icon('left')} Bản đồ</button>
-    ${scene(region)}
+    ${cover('chapter','灯',story.scene)}
     <div class="card mt14">
       <div class="mini-label">${esc(region.name)} · Chặng ${mission.step}</div>
       <h1 class="mt8">${esc(story.title || 'Theo dấu đèn lồng')}</h1>
@@ -393,6 +489,7 @@ function trailTask(task) {
       <h2>${title}</h2>
       <p class="adventure-progress">${count}/${total} ${locations}</p>
     </header>
+    ${cover('trail','灯',story.scene)}
     ${phase === 'recall' ? `<div class="adventure-memory adventure-clue" id="adventure-clue">
       <p>Thắp đèn nơi bạn gặp từ này</p><strong>${clue}</strong>
     </div>` : ''}
@@ -546,7 +643,7 @@ function dialogueTask(task){
     ${glossary(task,[])}${answerOptions(task,'answer-dialogue',{chinese:true})}</div>`;
 }
 function feedbackTask(feedback){return `<div class="feedback-screen ${feedback.quality==='good'?'good':'retry'}"><span class="feedback-emoji">${feedback.quality==='good'?'🌿':feedback.quality==='almost'?'💡':'💛'}</span><h2>${esc(feedback.heading)}</h2><p>${esc(feedback.intro)}</p><div class="feedback-answer"><strong>${hanzi(feedback.answerHanzi||'')}</strong>${feedback.pinyin?`<em>${esc(feedback.pinyin)}</em>`:''}${feedback.vi?`<span>${esc(feedback.vi)}</span>`:''}</div>${feedback.explanation?`<p class="explanation">${esc(feedback.explanation)}</p>`:''}<div class="button-row mt18">${feedback.answerHanzi?btn('speak',`${icon('sound')} Nghe lại`,'button-white','data-text="'+esc(feedback.answerHanzi)+'"'):''}${btn('next-task',`${icon('arrow')} Tiếp tục`,'primary')}</div></div>`;}
-function finished(){const f=lastFinish||{title:'Hoàn thành buổi học',description:'Những từ khó sẽ xuất hiện lại vào lúc cần ôn.'};const st=E.stats(state);return frame(`<div class="finish"><div class="finish-icon" aria-hidden="true">${f.symbol||'🌿'}</div><h1>${esc(f.title)}</h1><p class="subtle mt10">${esc(f.description||'Bạn đã luyện lại chữ Hán, Pinyin và cách dùng. Các từ chưa chắc sẽ tiếp tục quay lại.')}</p><div class="finish-stat"><div><strong>${st.seen}/300</strong><small>Từ đã gặp</small></div><div><strong>${st.due}</strong><small>Lượt cần ôn</small></div></div>${btn('begin-next',`${icon('play')} Khám phá tiếp`,'primary full mt20')}${btn('nav',`${icon('repeat')} Ôn những từ đã gặp`,'button-soft full mt12','data-view="review"')}${btn('nav','Về trang chủ','button-text full mt8','data-view="home"')}</div>`,'home');}
+function finished(){const f=lastFinish||{title:'Hoàn thành buổi học',description:'Những từ khó sẽ xuất hiện lại vào lúc cần ôn.'};const st=E.stats(state);return frame(`<div class="finish">${cover('ending','灯','river')}<h1>${esc(f.title)}</h1><p class="subtle mt10">${esc(f.description||'Bạn đã luyện lại chữ Hán, Pinyin và cách dùng. Các từ chưa chắc sẽ tiếp tục quay lại.')}</p><div class="finish-stat"><div><strong>${st.seen}/300</strong><small>Từ đã gặp</small></div><div><strong>${st.due}</strong><small>Lượt cần ôn</small></div></div>${btn('begin-next',`${icon('play')} Khám phá tiếp`,'primary full mt20')}${btn('nav',`${icon('repeat')} Ôn những từ đã gặp`,'button-soft full mt12','data-view="review"')}${btn('nav','Về trang chủ','button-text full mt8','data-view="home"')}</div>`,'home');}
 let lastFinish=null;
 const taskViews={learn:learnTask,meaning:meaningTask,reading:readingTask,hanzi:hanziTask,tone:toneTask,
   cloze:clozeTask,build:buildTask,story:storyTask,passage:passageTask,dialogue:dialogueTask,trail:trailTask};
@@ -597,9 +694,15 @@ function render() {
 
 reduceMedia.addEventListener?.('change', () => {
   document.body.classList.toggle('reduce-motion', lowMotion());
+  const tour=app.querySelector('[data-action="arcade-tour"]');
+  if(tour) {
+    if(lowMotion())stopTour();
+    tour.hidden=lowMotion();
+  }
   bindCinemaScene();
 });
 function goto(next) {
+  if(view==='arcade')stopTour();
   view=next;
   render();
   scrollUp();
@@ -641,7 +744,8 @@ function visitSpot(id) {
   E.save(state);
   render();
   const marker = app.querySelector(`[data-action="trail-spot"][data-id="${id}"]`);
-  motion(result.correct === true ? 'lantern' : result.correct === false ? 'miss' : 'discover', marker);
+  motion(result.correct === true ? 'lantern' : result.correct === false ? 'miss' : 'discover',
+    marker, {index:task.wordIds.indexOf(id)});
   if (result.correct) {
     focusAdventure(result.progress.solved.length === task.wordIds.length
       ? '[data-action="trail-gate"]' : '#adventure-clue');
@@ -856,7 +960,14 @@ app.addEventListener('click',e=>{
  const act=b.dataset.action,id=b.dataset.id;
  if(act==='reload'){location.reload();return;}
  if(act==='nav'){goto(b.dataset.view);return;}
- if(act==='arcade-start'&&arcade&&Object.hasOwn(arcade.games,id)){arcadeId=id;goto('arcade-game');return;}
+ if(act==='arcade-preview'){stopTour();arcadePreview(id);return;}
+ if(act==='arcade-tour'){toggleTour(b);return;}
+ if(act==='arcade-feature-play'||act==='arcade-start'){
+   const picked=act==='arcade-feature-play'?gameIds[arcadeFocus]:id;
+   const index=gameIds.indexOf(picked);
+   if(index!==-1){arcadeFocus=index;arcadeId=picked;goto('arcade-game');}
+   return;
+ }
  if(act==='region'){selectedRegion=id;render();motion('discover',app.querySelector('.region-card.expanded .scene'));return;}
  if(act==='start-mission'){startMission(id);return;}
  if(act==='begin-next'){const next=nextMission();startMission(next.id);return;}
@@ -966,13 +1077,20 @@ function saveReadingInput(){
   if(current()?.type==='reading'&&!state.active.feedback)E.save(state);
 }
 document.addEventListener('visibilitychange',()=>{
-  if(document.visibilityState==='hidden')saveReadingInput();
+  if(document.hidden){saveReadingInput();stopTour();}
 });
 window.visualViewport?.addEventListener('resize',()=>{
   const input=document.activeElement;
   if(input?.id==='reading-answer')input.scrollIntoView({block:'nearest'});
 });
 app.addEventListener('change',async e=>{
+ if(e.target.id==='map-region'&&Object.hasOwn(R,e.target.value)){
+   selectedRegion=e.target.value;
+   render();
+   app.querySelector('#map-region')?.focus({preventScroll:true});
+   motion('discover',app.querySelector('[data-cinema-cover]'));
+   return;
+ }
  if(e.target.id==='story-select'){storyRegion=e.target.value;storyRevealed={};storyShowPinyin=state.preferences.viewPinyin;render();return;}
  if(e.target.id==='import-file'&&e.target.files?.[0]){
    const file=e.target.files[0];

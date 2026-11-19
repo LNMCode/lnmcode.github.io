@@ -30,11 +30,10 @@
   games.wind = function mountWind(root, ctx) {
     root.innerHTML = `
       <section class="wind-game" data-wind aria-label="Đường Gió">
-        <p class="wind-intro">Lái diều qua cửa mang chữ Hán khớp với gợi ý. Ghé luồng gió để nhận thêm điểm.</p>
         <div class="wind-hud" aria-label="Tiến độ">
-          <div><small>Trạm</small><b data-wind-round></b></div>
-          <div><small>Điểm</small><b data-wind-score>0</b></div>
-          <div><small>Chuỗi đúng</small><b data-wind-streak>0</b></div>
+          <div><b data-wind-round></b><small>Cửa gió</small></div>
+          <div><b data-wind-score>0</b><small>Điểm</small></div>
+          <div><b data-wind-streak>0</b><small>Chuỗi đúng</small></div>
         </div>
         <ol class="wind-route" role="list" aria-label="Tiến độ trạm"></ol>
         <div class="wind-play">
@@ -43,12 +42,16 @@
             <strong data-wind-clue></strong>
           </div>
           <div class="wind-stage" data-wind-stage data-cinema-stage aria-label="Đường bay ba làn">
+            <i class="wind-moon" aria-hidden="true"></i>
             <i class="wind-ridges" aria-hidden="true"></i>
+            <div class="wind-runway" aria-hidden="true"><i></i><i></i><i></i></div>
+            <div class="wind-slipstream" aria-hidden="true"><i></i><i></i><i></i></div>
             <div class="wind-doors" role="group" aria-label="Chọn làn cửa chữ">
-              ${laneNames.map((_, lane) => '<button type="button" data-wind-lane="' + lane + '"><span lang="zh-Hans"></span></button>').join('')}
+              ${laneNames.map((_, lane) => `<button type="button" data-wind-lane="${lane}"><i class="wind-lintel" aria-hidden="true"></i><span lang="zh-Hans"></span></button>`).join('')}
             </div>
             <div class="wind-ribbon" aria-hidden="true" hidden><b>≈</b></div>
-            <div class="wind-kite" aria-hidden="true"><i></i><b></b></div>
+            <div class="wind-kite" aria-hidden="true"><i></i><b></b><em></em></div>
+            <div class="wind-gain" data-wind-gain aria-hidden="true"></div>
           </div>
           <div class="wind-controls">
             <button type="button" class="btn button-soft wind-steer" data-wind-move="-1" aria-label="Qua làn trái">←</button>
@@ -72,6 +75,7 @@
     const clue = view.querySelector('[data-wind-clue]');
     const gates = [...view.querySelectorAll('[data-wind-lane]')];
     const ribbon = view.querySelector('.wind-ribbon');
+    const gain = view.querySelector('[data-wind-gain]');
     const cross = view.querySelector('[data-wind-cross]');
     const steers = [...view.querySelectorAll('[data-wind-move]')];
     const status = view.querySelector('[data-wind-status]');
@@ -134,6 +138,7 @@
 
     function move(index) {
       if (crossing || finished || index < 0 || index >= route[round].gates.length || index === lane) return;
+      stage.dataset.bank = index < lane ? 'left' : 'right';
       lane = index;
       ctx.motion?.('steer', stage, {lane});
       if (lane === draftLane && !charged) {
@@ -153,6 +158,8 @@
       charged = false;
       crossing = false;
       stage.dataset.flight = '';
+      stage.dataset.bank = '';
+      gain.textContent = '';
       const review = current.revisits !== null;
       roundLabel.textContent = review ? 'Bay bù' : `${round + 1}/${originalCount}`;
       clueKind.textContent = current.fromReading ? 'Tìm chữ theo Pinyin' : 'Tìm chữ theo nghĩa';
@@ -176,7 +183,8 @@
       next.hidden = true;
       updateRoute();
       updateSteering();
-      setStatus(review ? 'Chữ này quay lại để bạn thử nhớ thêm một lần.' : 'Chạm cửa, vuốt diều hoặc dùng phím mũi tên để đổi làn.');
+      setStatus(review ? 'Chữ này quay lại để bạn thử nhớ thêm một lần.' : 'Chạm cửa hoặc vuốt diều để đổi làn. Đón xoáy gió để thêm điểm.');
+      ctx.motion?.('round', stage, {lane, round});
     }
 
     function setup() {
@@ -217,6 +225,7 @@
         hits++;
         const points = (review ? 60 : 100) + (charged ? 30 : 0) + Math.min(streak - 1, 4) * 15;
         score += points;
+        gain.textContent = `+${points}`;
         setStatus(`Qua cửa! ${current.word.hanzi} · ${current.word.pinyin} · ${current.word.vi}. +${points} điểm.`, 'good');
       } else {
         streak = 0;

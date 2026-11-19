@@ -2,6 +2,7 @@
   'use strict';
 
   const registry = window.HSK_MINIGAMES ||= {};
+  const svgNamespace = 'http://www.w3.org/2000/svg';
 
   function shuffle(items) {
     const shuffled = [...items];
@@ -29,19 +30,23 @@
     root.innerHTML = `
       <section class="memory-game pair-game" data-arcade-mode="pairs" aria-label="Đèn Đôi">
         <div class="memory-game-head">
-          <p class="memory-game-rule">Lật hai đèn để tìm chữ Hán và nghĩa của nó. Hãy nhớ vị trí những đèn đã mở.</p>
+          <p class="memory-game-rule">Mở hai đèn để ghép chữ Hán với nghĩa. Ghi nhớ vị trí mỗi đèn bạn đã mở.</p>
           <div class="memory-game-actions" aria-label="Số cặp đèn">
             <button type="button" class="btn button-white" data-pairs-size="4" aria-pressed="true">4 cặp</button>
             <button type="button" class="btn button-white" data-pairs-size="6" aria-pressed="false">6 cặp</button>
           </div>
         </div>
         <div class="memory-game-score"></div>
-        <div class="pair-grid" data-cinema-stage role="group" aria-label="Bàn lật đèn"></div>
+        <div class="pair-tray">
+          <div class="pair-grid" data-cinema-stage role="group" aria-label="Bàn lật đèn"></div>
+          <svg class="pair-thread" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
+        </div>
         <p class="memory-game-status" role="status" aria-live="polite"></p>
         <div class="memory-game-actions pair-controls"></div>
       </section>`;
 
     board = root.querySelector('.pair-grid');
+    const thread = root.querySelector('.pair-thread');
     scoreboard = root.querySelector('.memory-game-score');
     live = root.querySelector('.memory-game-status');
     controls = root.querySelector('.pair-controls');
@@ -62,15 +67,16 @@
       window.clearTimeout(timer);
       size = nextSize;
       const words = wordsForRound(size);
-      cards = shuffle(words.flatMap((word) => [
-        {word, side:'hanzi', value:word.hanzi},
-        {word, side:'meaning', value:word.vi},
+      cards = shuffle(words.flatMap((word, color) => [
+        {word, color, side:'hanzi', value:word.hanzi},
+        {word, color, side:'meaning', value:word.vi},
       ]));
       open = [];
       paired = new Set();
       moves = 0;
       message = cards.length ? 'Chọn một đèn để bắt đầu.' : 'Chưa có từ phù hợp. Hãy thử lại sau khi học thêm.';
       status = '';
+      thread.replaceChildren();
       for (const button of root.querySelectorAll('[data-pairs-size]')) {
         button.setAttribute('aria-pressed', String(Number(button.dataset.pairsSize) === size));
       }
@@ -85,6 +91,7 @@
         button.type = 'button';
         button.className = 'pair-card';
         button.dataset.pairsCard = index;
+        button.style.setProperty('--card-delay', `${index * 25}ms`);
         button.innerHTML = '<span class="pair-card-shell"><span class="pair-card-cover" aria-hidden="true"><i></i></span><span class="pair-card-value"></span></span>';
         board.append(button);
       });
@@ -98,7 +105,8 @@
     function update() {
       const pairs = cards.length / 2;
       const finished = pairs > 0 && paired.size === pairs;
-      scoreboard.innerHTML = `<span><b>${paired.size}/${pairs}</b> cặp sáng</span><span><b>${moves}</b> lượt lật</span>`;
+      scoreboard.innerHTML = `<span><b>${paired.size}/${pairs}</b> cặp sáng</span><span class="pair-lamp-progress" aria-hidden="true">${Array.from({length:pairs}, (_, index) => `<i${index < paired.size ? ' class="is-lit"' : ''}></i>`).join('')}</span><span><b>${moves}</b> lượt lật</span>`;
+      board.classList.toggle('is-complete', finished);
       Array.from(board.children).forEach((button, index) => {
         const card = cards[index];
         const matched = paired.has(card.word.id);
@@ -108,6 +116,7 @@
         button.classList.toggle('is-paired', matched);
         button.classList.toggle('is-missed', open.includes(index) && status === 'missed');
         button.dataset.side = visible ? card.side : '';
+        button.dataset.pairColor = matched ? card.color : '';
         button.setAttribute('aria-disabled', String(matched || open.includes(index) || status === 'missed'));
         button.setAttribute('aria-label', visible
           ? `${card.side === 'hanzi' ? 'Chữ' : 'Nghĩa'} ${card.value}${matched ? ', đã ghép' : ''}`
@@ -120,6 +129,25 @@
       controls.innerHTML = finished
         ? '<button type="button" class="btn primary" data-pairs-replay>Thắp ván mới</button>'
         : status === 'missed' ? '<button type="button" class="btn button-soft" data-pairs-continue>Úp hai đèn</button>' : '';
+    }
+
+    function connect(from, target, color) {
+      const bounds = thread.getBoundingClientRect();
+      if (!bounds.width || !bounds.height) return;
+      const center = element => {
+        const rect = element.getBoundingClientRect();
+        return [(rect.left + rect.width / 2 - bounds.left) * 100 / bounds.width,
+          (rect.top + rect.height / 2 - bounds.top) * 100 / bounds.height];
+      };
+      const [x1, y1] = center(from);
+      const [x2, y2] = center(target);
+      const arc = Math.max(5, (y1 + y2) / 2 - 17);
+      const wire = document.createElementNS(svgNamespace, 'path');
+      wire.setAttribute('d', `M ${x1} ${y1} Q ${(x1 + x2) / 2} ${arc} ${x2} ${y2}`);
+      wire.setAttribute('pathLength', '1');
+      wire.setAttribute('vector-effect', 'non-scaling-stroke');
+      wire.dataset.pairColor = color;
+      thread.replaceChildren(wire);
     }
 
     function closeMissed() {
@@ -142,7 +170,7 @@
       if (open.length === 1) {
         message = card.side === 'hanzi' ? 'Tìm đèn có nghĩa của chữ này.' : 'Tìm đèn có chữ Hán tương ứng.';
         update();
-        ctx.motion?.('flip', target);
+        ctx.motion?.('flip', target, {index});
         return;
       }
       moves++;
@@ -153,7 +181,8 @@
         open = [];
         message = `${card.word.hanzi} · ${card.word.pinyin} · ${card.word.vi}. Cặp đèn đã sáng.`;
         update();
-        ctx.motion?.('match', target, {from});
+        connect(from, target, card.color);
+        ctx.motion?.('match', target, {from, index, progress: paired.size / (cards.length / 2)});
         ctx.grade(card.word.id, 'meaning', 'good');
         if (paired.size === cards.length / 2) {
           controls.querySelector('[data-pairs-replay]').focus({preventScroll:true});

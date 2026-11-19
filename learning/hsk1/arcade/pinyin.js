@@ -4,8 +4,8 @@
   const WAVE_SIZES = [2, 3, 3];
   const SPOTS = {
     1: [[50, 45]],
-    2: [[26, 42], [73, 56]],
-    3: [[19, 51], [50, 32], [81, 55]],
+    2: [[31, 42], [72, 57]],
+    3: [[21, 54], [50, 34], [79, 52]],
   };
 
   function mount(root, ctx) {
@@ -15,17 +15,22 @@
           <p>Gõ âm đúng để nối sáng các chòm sao.</p>
           <button class="pinyin-pause" data-pinyin-pause type="button" aria-pressed="false">Tạm dừng</button>
         </header>
-        <div class="pinyin-hud" aria-label="Tiến độ ván">
-          <div><span>Chòm sao</span><strong data-pinyin-wave></strong></div>
-          <div><span>Điểm</span><strong data-pinyin-score></strong></div>
-          <div><span>Chuỗi đúng</span><strong data-pinyin-combo></strong></div>
-        </div>
         <div class="pinyin-sky" data-cinema-stage>
+          <div class="pinyin-dials" aria-hidden="true"><i></i><i></i><i></i></div>
+          <div class="pinyin-arc" aria-hidden="true"></div>
           <svg class="pinyin-constellation" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
           <div class="pinyin-targets" aria-label="Các sao chữ Hán"></div>
           <span class="pinyin-pulse" aria-hidden="true" hidden></span>
-          <span class="pinyin-origin" aria-hidden="true"></span>
+          <span class="pinyin-origin" aria-hidden="true"><i></i></span>
+          <div class="pinyin-observatory-readout">
+            <span>Chòm sao</span><strong data-pinyin-wave></strong>
+            <div class="pinyin-phase-lights" aria-hidden="true"></div>
+          </div>
           <p class="pinyin-paused" hidden>Chòm sao đang dừng</p>
+        </div>
+        <div class="pinyin-hud" aria-label="Tiến độ ván">
+          <div><span>Điểm</span><strong data-pinyin-score></strong></div>
+          <div><span>Chuỗi đúng</span><strong data-pinyin-combo></strong></div>
         </div>
         <div class="pinyin-play">
           <form class="pinyin-form">
@@ -64,6 +69,7 @@
     const status = game.querySelector('.pinyin-status');
     const pulse = game.querySelector('.pinyin-pulse');
     const result = game.querySelector('.pinyin-result');
+    const phaseLights = game.querySelector('.pinyin-phase-lights');
     const listeners = new AbortController();
     const reducedMotion = Boolean(ctx.lowMotion) || matchMedia('(prefers-reduced-motion: reduce)').matches;
     let words;
@@ -90,6 +96,10 @@
       game.querySelector('[data-pinyin-wave]').textContent = `${wave + 1}/${waves.length}`;
       game.querySelector('[data-pinyin-score]').textContent = score;
       game.querySelector('[data-pinyin-combo]').textContent = streak;
+      Array.from(phaseLights.children, (light, index) => {
+        light.classList.toggle('is-current', index === wave);
+        light.classList.toggle('is-complete', index < wave || done && hits > 0);
+      });
     }
 
     function syncControls() {
@@ -119,6 +129,7 @@
       const current = waves[wave];
       layer.replaceChildren();
       constellation.replaceChildren();
+      sky.dataset.wave = wave;
       lastConnected = null;
       targets = current.map((word, index) => {
         const [x, y] = SPOTS[current.length][index];
@@ -128,7 +139,7 @@
         button.dataset.pinyinTarget = word.id;
         button.style.setProperty('--pinyin-x', `${x}%`);
         button.style.setProperty('--pinyin-y', `${y}%`);
-        button.style.setProperty('--pinyin-delay', `${index * -.9}s`);
+        button.style.setProperty('--pinyin-delay', `${index * .065}s`);
         const glyph = document.createElement('span');
         glyph.className = 'pinyin-glyph';
         glyph.lang = 'zh-Hans';
@@ -139,7 +150,7 @@
         button.append(star);
         button.setAttribute('aria-label', word.hanzi);
         layer.append(button);
-        return { word, button, x, y, cleared: false, helped: false, messy: false };
+        return { word, button, index, x, y, cleared: false, helped: false, messy: false };
       });
       selectTarget(targets[0]);
       syncHud();
@@ -158,6 +169,8 @@
       wave = 0;
       score = streak = hits = 0;
       done = paused = transitioning = false;
+      phaseLights.replaceChildren(...waves.map(() => document.createElement('i')));
+      sky.classList.remove('is-complete');
       game.querySelector('.pinyin-play').hidden = false;
       result.hidden = true;
       input.value = '';
@@ -177,6 +190,8 @@
     function finish() {
       done = true;
       syncControls();
+      syncHud();
+      sky.classList.toggle('is-complete', hits > 0);
       game.querySelector('.pinyin-play').hidden = true;
       result.hidden = false;
       result.querySelector('[data-pinyin-summary]').textContent = `Đã nối ${hits}/${words.length} sao · ${score} điểm`;
@@ -194,15 +209,27 @@
       if (next) {
         selectTarget(next);
       } else if (wave + 1 < waves.length) {
-        wave += 1;
-        showWave();
+        const advance = () => {
+          wave += 1;
+          transitioning = false;
+          showWave();
+        };
+        if (reducedMotion || !target.button.classList.contains('is-connected')) {
+          advance();
+        } else {
+          transitioning = true;
+          syncControls();
+          ctx.motion?.('collect', sky, {progress: (wave + 1) / waves.length});
+          pendingTimer = setTimeout(advance, 380);
+        }
       } else {
         finish();
       }
     }
 
     function connectStar(target) {
-      ctx.motion?.('hit', target.button.firstElementChild);
+      target.button.classList.add('is-connected');
+      ctx.motion?.('hit', target.button.firstElementChild, {index: target.index, progress: hits / words.length, glyph: target.word.hanzi});
       if (lastConnected) {
         const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
         line.setAttribute('x1', lastConnected.x);
@@ -210,6 +237,7 @@
         line.setAttribute('x2', target.x);
         line.setAttribute('y2', target.y);
         line.setAttribute('vector-effect', 'non-scaling-stroke');
+        line.setAttribute('pathLength', '1');
         constellation.append(line);
         ctx.motion?.('link', target.button, {from: lastConnected.button});
       }
@@ -251,11 +279,11 @@
       pulse.style.setProperty('--pinyin-flight-y', `${dy}px`);
       pulse.hidden = false;
       target.button.classList.add('is-struck');
-      ctx.motion?.('launch', target.button.firstElementChild, {from: origin});
+      ctx.motion?.('launch', target.button.firstElementChild, {from: origin, index: target.index});
       pendingTimer = setTimeout(() => {
         connectStar(target);
         finishTarget(target);
-      }, 470);
+      }, 550);
     }
 
     function fire(event) {

@@ -4,6 +4,8 @@
   const base = new URL('./', document.currentScript.src);
   const threeUrl = new URL('vendor/three.module.min.js', base).href;
   const scenesUrl = new URL('cinema-scenes.js', base).href;
+  const storyUrl = new URL('story-world.js', base).href;
+  const gamesUrl = new URL('game-sets.js', base).href;
   const worldHeight = 10;
   const maxEffects = 12;
   const particleCount = 36;
@@ -16,6 +18,7 @@
   const recipes = {
     enter: {rings: 1, amount: 8, size: .33, life: .7},
     enterGame: {rings: 2, amount: 14, size: .62, life: .8},
+    round: {rings: 1, amount: 7, size: .4, life: .48},
     launch: {travel: 'comet', life: .47},
     hit: {rings: 2, amount: 24, size: .89, life: .78},
     miss: {rings: 1, amount: 9, size: .47, life: .56, color: 0xfa8c80},
@@ -48,7 +51,7 @@
   let rendererModules;
 
   function loadModules() {
-    rendererModules ||= Promise.all([import(threeUrl), import(scenesUrl)]);
+    rendererModules ||= Promise.all([import(threeUrl), import(scenesUrl), import(storyUrl), import(gamesUrl)]);
     return rendererModules;
   }
 
@@ -70,15 +73,20 @@
     return texture;
   }
 
-  function releaseGroup(group) {
+  function releaseGroup(group, releaseTextures = false) {
     const geometries = new Set();
     const materials = new Set();
+    const textures = new Set();
     group.traverse(node => {
       if (node.geometry) geometries.add(node.geometry);
       if (node.material) materials.add(node.material);
     });
     geometries.forEach(geometry => geometry.dispose());
-    materials.forEach(material => material.dispose());
+    for (const material of materials) {
+      if (releaseTextures && material.map) textures.add(material.map);
+      material.dispose();
+    }
+    for (const texture of textures) texture.dispose();
     group.removeFromParent();
   }
 
@@ -229,7 +237,7 @@
     return {group, begin, draw, started:()=>state.beginAt};
   }
 
-  function rendererFor(canvas, context, THREE, library, settings) {
+  function rendererFor(canvas, context, THREE, library, storyModels, gameModels, settings) {
     const renderer = new THREE.WebGLRenderer({
       canvas, context, alpha:true, antialias:true, powerPreference:'low-power', premultipliedAlpha:true,
     });
@@ -239,6 +247,34 @@
     camera.position.z = 24;
     const background = new THREE.Scene();
     const foreground = new THREE.Scene();
+    const world = new THREE.Scene();
+    const worldCamera = new THREE.OrthographicCamera(-5, 5, 5, -5, .1, 50);
+    const key = new THREE.DirectionalLight(0xffe1b2, 2.2);
+    const rim = new THREE.DirectionalLight(0xc2c9ff, 1.34);
+    const fill = new THREE.HemisphereLight(0xf9e9ff, 0x504063, 2.05);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
+    key.castShadow = true;
+    key.shadow.mapSize.set(1024, 1024);
+    Object.assign(key.shadow.camera, {left:-8, right:8, top:8, bottom:-8, near:.35, far:26});
+    key.shadow.camera.updateProjectionMatrix();
+    key.shadow.bias = -.00024;
+    key.shadow.normalBias = .035;
+    world.add(key, key.target, rim, rim.target, fill);
+
+    const actor = storyModels.createTraveler(THREE);
+    const story = storyModels.createStoryWorld(THREE, actor);
+    world.add(story.root);
+    const look = new THREE.Vector3();
+    const offset = new THREE.Vector3();
+    const gameSets = new Map();
+    const celebration = new Set(['unlock','seal','hit','cross','connect','match','sail','reward','complete','success']);
+    let activeSet = null;
+    let shownWorld = '';
+    let shownFocus = -1;
+    let cameraBeat = -Infinity;
+    let actorBeat = -Infinity;
+    let actorMood = '';
     const texture = textureFor(THREE);
     const effects = Array.from({length:maxEffects}, () => buildEffect(THREE, texture, foreground));
     let frame = 0;
@@ -254,6 +290,7 @@
     let flight = 0;
     let lastSize;
     let stageRect;
+    let coverRect;
     let stageOnScreen = true;
     let dirty = true;
     let lost = false;
@@ -276,6 +313,11 @@
       };
       stageRect = {x:rect.left - canvasRect.left, y:rect.top - canvasRect.top,
         width:rect.width, height:Math.min(height, rect.height)};
+      const cover = settings.cover?.isConnected ? settings.cover.getBoundingClientRect() : null;
+      coverRect = cover?.width && cover.height ? {
+        x:cover.left - canvasRect.left + 1, y:cover.top - canvasRect.top + 1,
+        width:cover.width - 2, height:cover.height - 2,
+      } : null;
       if (!lastSize || lastSize.width !== width || lastSize.height !== height) {
         renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.4, Math.sqrt(950000 / (width * height))));
         renderer.setSize(width, height, false);
@@ -285,6 +327,91 @@
         lastSize = {width,height};
       }
       dirty = false;
+    }
+
+    function changeWorld(now) {
+      const name = settings.name;
+      const focus = settings.focus;
+      if (name === shownWorld && focus === shownFocus) return;
+      const newRoute = name !== shownWorld;
+      if (activeSet) activeSet.root.visible = false;
+      activeSet = null;
+      shownWorld = name;
+      shownFocus = focus;
+      cameraBeat = now;
+      if (gameNames.has(name)) {
+        if (!gameSets.has(name)) {
+          const set = gameModels.createGameSet(THREE, name);
+          gameSets.set(name, set);
+          world.add(set.root);
+        }
+        activeSet = gameSets.get(name);
+        activeSet.root.visible = true;
+        story.root.visible = false;
+        activeSet.root.add(actor.root);
+        actor.root.scale.setScalar(.97);
+        actor.root.position.set(-2.38, -.12, 1.04);
+        actorBeat = now + 260;
+        actorMood = 'wave';
+        activeSet.cue('enterGame', {});
+      } else {
+        const path = name === 'finished' || name === 'progress' ? 'ending'
+          : name === 'arcade' ? 'arcade'
+          : name === 'home' || name === 'settings' ? 'home' : 'map';
+        story.root.visible = true;
+        story.show(path, Math.max(0, focus));
+        if (newRoute) story.cue(name === 'finished' ? 'complete' : 'enter');
+      }
+    }
+
+    function showWorld(now, dt, width, height) {
+      if (!coverRect) return false;
+      const {x,y,width:w,height:h} = coverRect;
+      const left = clamp(x, 0, width);
+      const right = clamp(x+w, 0, width);
+      const bottom = clamp(height-y-h, 0, height);
+      const top = clamp(height-y, 0, height);
+      if (right <= left || top <= bottom || w <= 1 || h <= 1) return false;
+
+      if (activeSet) {
+        activeSet.update(dt, runningTime);
+        const beat = (now - actorBeat) / 920;
+        const entering = easeOut(clamp((now - cameraBeat) / 760));
+        actor.root.position.x = -2.27 - (1 - entering) * 1.6;
+        actor.update(dt, runningTime, {moving:Math.sin(entering * Math.PI), emotion:beat < 0 ? '' : actorMood, stride:beat});
+        look.copy(activeSet.target);
+      } else {
+        story.update(dt, runningTime, false);
+        look.copy(story.cameraTarget);
+      }
+
+      const a = w/h;
+      const close = activeSet ? 4.65 : shownWorld === 'home' ? 6.15 : 5.45;
+      const elapsed = clamp((now - cameraBeat) / 1000);
+      const dolly = 1 + (1 - easeOut(elapsed)) * .15;
+      const punchTime = clamp((now - actorBeat) / 710);
+      const punch = activeSet && actorMood === 'celebrate' ? Math.sin(punchTime * Math.PI) * .073 : 0;
+      const viewHeight = Math.max(close, (activeSet ? 8.85 : 7.45) / a) * dolly * (1 - punch);
+      const idle = Math.sin(runningTime * .58);
+      worldCamera.left = -viewHeight * a / 2;
+      worldCamera.right = -worldCamera.left;
+      worldCamera.top = viewHeight / 2;
+      worldCamera.bottom = -worldCamera.top;
+      worldCamera.updateProjectionMatrix();
+      offset.set((activeSet ? 3.1 : 5.3) + idle * .35 + punch * 4, activeSet ? 5.1 : 5.4, 9.3);
+      worldCamera.position.copy(look).add(offset);
+      worldCamera.lookAt(look);
+      key.position.set(look.x-3.3, 6.2, look.z+4.8);
+      key.target.position.set(look.x, .3, look.z);
+      rim.position.set(look.x+4, 4.2, look.z-4);
+      rim.target.position.set(look.x, .4, look.z);
+      renderer.setViewport(x, height-y-h, w, h);
+      renderer.setScissor(left, bottom, right-left, top-bottom);
+      renderer.setScissorTest(true);
+      renderer.render(world, worldCamera);
+      renderer.setScissorTest(false);
+      renderer.setViewport(0, 0, width, height);
+      return true;
     }
 
     function clear() {
@@ -307,8 +434,10 @@
       const right = clamp(x + w, 0, width);
       const top = clamp(y, 0, height);
       const bottom = clamp(y + h, 0, height);
-      stageOnScreen = right > left && bottom > top;
-      if (stageOnScreen) {
+      const renderedWorld = showWorld(now, dt, width, height);
+      const anchorOnScreen = right > left && bottom > top;
+      stageOnScreen = renderedWorld || !coverRect && anchorOnScreen;
+      if (!coverRect && anchorOnScreen) {
         const stageScale = worldHeight / height;
         project({x:(x + w / 2) / width, y:(y + h / 2) / height}, stage.group.position);
         stage.draw({ width:w * stageScale, height:h * stageScale, time:runningTime,
@@ -333,7 +462,7 @@
     function draw(now) {
       frame = 0;
       if (!canAnimate()) return;
-      const interval = now - actionTime < 1300 || now - startedAt < 730 ? 15 : 31;
+      const interval = now - actionTime < 1250 || now - cameraBeat < 2150 || now - startedAt < 730 ? 15 : 31;
       if (now - lastFrame >= interval) redraw(now);
       if (stageOnScreen || dirty || effects.some(effect => effect.group.visible)) {
         frame = requestAnimationFrame(draw);
@@ -348,11 +477,15 @@
     const observeSize = typeof ResizeObserver === 'function' ? new ResizeObserver(invalidate) : null;
     observeSize?.observe(canvas);
     let observed;
+    let observedCover;
     function observeAnchor() {
-      if (observed === settings.anchor) return;
+      if (observed === settings.anchor && observedCover === settings.cover) return;
       if (observed) observeSize?.unobserve(observed);
+      if (observedCover) observeSize?.unobserve(observedCover);
       observed = settings.anchor;
+      observedCover = settings.cover;
       if (observed?.isConnected) observeSize?.observe(observed);
+      if (observedCover?.isConnected) observeSize?.observe(observedCover);
     }
 
     function fire(event) {
@@ -362,6 +495,18 @@
       if (finite(event.detail.lane)) targetLane = clamp(event.detail.lane, 0, 2);
       if (finite(event.detail.signal)) signal = .37 + event.detail.signal * .31;
       if (event.type === 'cross') flight = event.detail.correct === false ? -.46 : 1;
+      if (activeSet) {
+        activeSet.cue(event.type, event.detail);
+        if (event.type === 'miss' || event.detail.correct === false) {
+          actorMood = 'surprise';
+          actorBeat = now;
+        } else if (celebration.has(event.type)) {
+          actorMood = 'celebrate';
+          actorBeat = now;
+        }
+      } else {
+        story.cue(event.type, event.detail);
+      }
       if (event.type === 'steer') return;
       const candidate = effects.find(effect => !effect.group.visible) ||
         effects.reduce((earliest, effect) => effect.started() < earliest.started() ? effect : earliest);
@@ -371,6 +516,7 @@
 
     function sync() {
       observeAnchor();
+      changeWorld(performance.now());
       if (settings.name !== previous || !stage) {
         const firstScene = !stage;
         if (stage) {
@@ -448,6 +594,8 @@
         observeSize?.disconnect();
         releaseGroup(background);
         releaseGroup(foreground);
+        releaseGroup(world, true);
+        key.shadow.dispose();
         texture.dispose();
         renderer.dispose();
       },
@@ -475,7 +623,7 @@
   }
 
   function mount(canvas) {
-    const settings = {name:'home', anchor:null, lowMotion:false, paused:false};
+    const settings = {name:'home', anchor:null, cover:null, focus:0, lowMotion:false, paused:false};
     let display;
     let disposed = false;
     let initializing = false;
@@ -492,9 +640,9 @@
           unavailable = true;
           return;
         }
-        const [THREE, library] = await loadModules();
+        const [THREE, library, storyModels, gameModels] = await loadModules();
         if (disposed || !canvas.isConnected) return;
-        display = rendererFor(canvas, context, THREE, library, settings);
+        display = rendererFor(canvas, context, THREE, library, storyModels, gameModels, settings);
         canvas.dataset.visual = settings.lowMotion ? 'still' : '3d';
         if (pending && performance.now() - pending.time < 650) display.fire(pending.event);
         pending = null;
@@ -506,17 +654,22 @@
     }
 
     return {
-      setScene(name, {lowMotion = false, anchor = null} = {}) {
-        const changed = settings.name !== name || settings.anchor !== anchor;
+      setScene(name, {lowMotion = false, anchor = null, cover = null, focus = 0} = {}) {
+        const changed = settings.name !== name || settings.anchor !== anchor ||
+          settings.cover !== cover || settings.focus !== focus;
+        if (!changed && lowMotion === settings.lowMotion) return;
         if (settings.name !== name) {
           delete canvas.dataset.cue;
           pending = null;
         }
         settings.name = name;
         settings.anchor = anchor;
+        settings.cover = cover;
+        settings.focus = focus;
         settings.lowMotion = lowMotion;
         if (changed) settings.paused = false;
         canvas.dataset.scene = name;
+        canvas.dataset.focus = focus;
         canvas.dataset.visual = lowMotion ? 'still' : display?.active ? '3d' : '2d';
         if (display) display.sync();
         else if (!lowMotion) void initialize();

@@ -51,7 +51,9 @@
         </div>
         <div class="flow-river" data-cinema-stage role="group" aria-label="Các thuyền chở mảnh chữ">
           <div class="flow-current-water" aria-hidden="true"></div>
-          <div class="flow-skiff" aria-hidden="true"><i></i></div>
+          <div class="flow-islet flow-islet--one" aria-hidden="true"><i></i></div>
+          <div class="flow-islet flow-islet--two" aria-hidden="true"><i></i></div>
+          <div class="flow-skiff" aria-hidden="true"><i></i><b></b></div>
           <div class="flow-tile-grid"></div>
         </div>
         <p class="memory-game-status" role="status" aria-live="polite"></p>
@@ -59,6 +61,8 @@
       </section>`;
 
     header = root.querySelector('.memory-game-score');
+    const game = root.querySelector('.flow-game');
+    const reducedMotion = ctx.lowMotion || matchMedia('(prefers-reduced-motion: reduce)').matches;
     banks = root.querySelector('.flow-bridge');
     river = root.querySelector('.flow-river');
     live = root.querySelector('.memory-game-status');
@@ -84,6 +88,8 @@
       hintedPosition = -1;
       wrongPosition = -1;
       delivered = false;
+      game.classList.remove('is-delivered');
+      river.classList.remove('is-cycling');
       message = sentence ? 'Chạm một thuyền để đưa mảnh chữ vào cầu.' : 'Chưa có lời nhắn phù hợp. Hãy chơi lại sau khi học thêm.';
       update();
     }
@@ -103,6 +109,9 @@
       root.querySelector('.flow-message strong').textContent = sentence?.vi || '';
       header.innerHTML = `<span><b>${sentence ? current + 1 : 0}/${rounds.length}</b> chuyến</span><span><b>${points}</b> điểm</span>`;
       river.classList.toggle('is-delivered', delivered);
+      game.classList.toggle('is-delivered', delivered);
+      game.classList.toggle('has-error', wrongPosition >= 0);
+      game.classList.toggle('has-cargo', sequence.length > 0);
 
       banks.replaceChildren();
       if (sentence) {
@@ -130,6 +139,11 @@
         });
         boat.lang = 'zh-Hans';
         boat.setAttribute('aria-label', `Vớt mảnh ${tile.text}`);
+        const cargo = document.createElement('span');
+        cargo.className = 'flow-boat-cargo';
+        cargo.textContent = tile.text;
+        boat.replaceChildren(cargo);
+        if (hintedPosition >= 0 && sentence.tokens[hintedPosition] === tile.text) boat.classList.add('is-hinted');
         grid.append(boat);
       }
       const final = delivered && current + 1 === rounds.length;
@@ -163,7 +177,7 @@
       const id = Number(boat.dataset.flowTile);
       const tile = remainingTiles().find(item => item.index === id);
       if (!tile) return;
-      const bounds = boat.getBoundingClientRect();
+      const bounds = boat.querySelector('.flow-boat-cargo').getBoundingClientRect();
       const from = {x: (bounds.left + bounds.width / 2) / window.innerWidth,
         y: (bounds.top + bounds.height / 2) / window.innerHeight};
       sequence.push(tile);
@@ -171,8 +185,36 @@
       start = left ? start % left : 0;
       message = left ? `Đã vớt ${tile.text}.` : 'Cầu đã đủ mảnh. Đưa thuyền qua để kiểm tra thứ tự.';
       update();
-      ctx.motion?.('boat', banks.children[sequence.length - 1], {from});
+      const slot = banks.children[sequence.length - 1];
+      transfer(tile.text, bounds, slot);
+      ctx.motion?.('boat', slot, {from, index:sequence.length - 1, progress:sequence.length / rounds[current].tokens.length});
       focus(left ? '.flow-tile-grid button' : '[data-flow-send]');
+    }
+
+    function transfer(text, from, slot) {
+      if (reducedMotion || typeof game.animate !== 'function') return;
+      const stage = game.getBoundingClientRect();
+      const to = slot.getBoundingClientRect();
+      const dx = to.left + (to.width - from.width) / 2 - from.left;
+      const dy = to.top + (to.height - from.height) / 2 - from.top;
+      const cargo = document.createElement('span');
+      cargo.className = 'flow-boat-cargo flow-cargo-flying';
+      cargo.lang = 'zh-Hans';
+      cargo.textContent = text;
+      cargo.setAttribute('aria-hidden', 'true');
+      Object.assign(cargo.style, {left: `${from.left - stage.left}px`, top: `${from.top - stage.top}px`,
+        width: `${from.width}px`, height: `${from.height}px`});
+      game.append(cargo);
+      cargo.animate([
+        {transform:'translate(0, 0) rotate(-4deg)', opacity:1},
+        {transform:`translate(${dx * .5}px, ${dy * .5 - 26}px) rotate(12deg) scale(1.12)`, opacity:1, offset:.5},
+        {transform:`translate(${dx}px, ${dy}px) rotate(0) scale(.82)`, opacity:0},
+      ], {duration:490, easing:'cubic-bezier(.23,.71,.25,.98)'}).finished.then(() => cargo.remove(), () => cargo.remove());
+      slot.animate([
+        {filter:'brightness(.65)'},
+        {filter:'brightness(1.32)', offset:.8},
+        {filter:'brightness(1)'},
+      ], {duration:550, easing:'ease-out'});
     }
 
     function removeTile(index) {
@@ -208,6 +250,9 @@
       }
       message = `Mảnh ở vị trí ${index + 1} là ${sentence.tokens[index]}.`;
       live.textContent = message;
+      [...river.querySelectorAll('.flow-boat-cargo')].forEach(cargo => {
+        cargo.parentElement.classList.toggle('is-hinted', cargo.textContent === sentence.tokens[index]);
+      });
       ctx.motion?.('hint', banks.children[index]);
     }
 
@@ -229,7 +274,7 @@
       const quality = hints || mistakes ? 'almost' : 'good';
       for (const id of new Set(sentence.wordIds)) ctx.grade(id, 'usage', quality);
       update();
-      ctx.motion?.('sail', river, {fromX:.2, fromY:.86, toX:.79, toY:.19});
+      ctx.motion?.('sail', river, {fromX:.2, fromY:.86, toX:.79, toY:.19, progress:1, count:sequence.length, index:current});
       const final = current + 1 === rounds.length;
       focus(final ? '[data-flow-replay]' : '[data-flow-next]');
       if (final) {

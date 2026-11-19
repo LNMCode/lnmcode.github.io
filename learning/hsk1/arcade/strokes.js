@@ -87,15 +87,17 @@
     const ended = !drawing;
     const history = glyph.outlines.slice(0, stroke).map(path => `<path d="${esc(path)}"></path>`).join('');
     const outline = showModel && !ended ? glyph.outlines.map(path => `<path d="${esc(path)}"></path>`).join('') : '';
-    return `<svg class="ink-board${burst ? ' ink-board--sealed' : ''}" data-cinema-stage data-stroke-board data-stroke-count="${stroke}"
+    return `<div class="ink-desk"><div class="ink-paper${burst ? ' ink-paper--sealed' : ''}"><svg class="ink-board${burst ? ' ink-board--sealed' : ''}" data-cinema-stage data-stroke-board data-stroke-count="${stroke}"
       viewBox="0 0 1024 1024" role="img" aria-label="Ô viết chữ Hán, kéo một nét từ đầu tới cuối"
       preserveAspectRatio="none" focusable="false">
       <path class="ink-grid" d="M0 512H1024M512 0V1024M0 0L1024 1024M1024 0L0 1024"></path>
       <g class="ink-outline" transform="translate(0 900) scale(1 -1)">${outline}</g>
       <g class="ink-history" transform="translate(0 900) scale(1 -1)">${history}</g>
       ${start ? `<polyline class="ink-guide" points="${pointList(model)}"></polyline>
+        <circle class="ink-start-ring" cx="${start[0]}" cy="${start[1]}" r="35"></circle>
         <circle class="ink-start-dot" cx="${start[0]}" cy="${start[1]}" r="21"></circle>` : ''}
-      </svg>`;
+      </svg>${burst ? '<span class="ink-stamped" aria-hidden="true">印</span>' : ''}</div>
+      <span class="ink-brush" aria-hidden="true"></span></div>`;
   }
 
   games.strokes = function mount(root, ctx) {
@@ -137,7 +139,7 @@
         : 'Bạn có thể thử viết lại từ nghĩa và âm của chữ.');
       const seals = selected.map((item, index) => {
         const completed = results[index];
-        return `<span class="ink-seal${completed ? ' ink-seal--lit' : ''}" aria-label="${completed ? esc(item.hanzi) : `Ô dấu ${index + 1}`}">${completed ? `<span lang="zh-Hans">${esc(item.hanzi)}</span>` : '◆'}</span>`;
+        return `<span class="ink-seal${completed ? ' ink-seal--lit' : ''}${position === index && !completed ? ' ink-seal--active' : ''}" aria-label="${completed ? esc(item.hanzi) : `Ô dấu ${index + 1}`}">${completed ? `<span lang="zh-Hans">${esc(item.hanzi)}</span>` : '◆'}</span>`;
       }).join('');
       const actions = phase === 'ready'
         ? '<button type="button" class="btn primary" data-stroke-action="recall">Viết từ trí nhớ</button><button type="button" class="btn button-soft" data-stroke-action="next" data-stroke-next>Nhận dấu</button>'
@@ -153,10 +155,10 @@
           <h2 id="ink-game-title" data-stroke-title tabindex="-1">${title}</h2>
         </div><div class="ink-seals" aria-label="Các dấu đã khắc">${seals}</div></header>
         ${phase === 'intro' ? `<p class="ink-intro">Kéo từng nét đúng thứ tự để khắc ${selected.length} dấu chữ. Sau khi thấy mẫu, thử tự viết lại từ nghĩa và Pinyin.</p>
-          <div class="ink-cover" data-cinema-stage aria-hidden="true">${selected.map(item => `<span lang="zh-Hans">${esc(item.hanzi)}</span>`).join('')}</div>
+          <div class="ink-cover" data-cinema-stage aria-hidden="true"><i></i>${selected.map(item => `<span lang="zh-Hans">${esc(item.hanzi)}</span>`).join('')}</div>
           <button type="button" class="btn primary full" data-stroke-action="start" data-stroke-start>Bắt đầu viết</button>
           <p class="ink-attribution">Bộ 30 chữ HSK 1 dùng dữ liệu từ Make Me a Hanzi và Hanzi Writer Data. <a href="./arcade/ARPHICPL.TXT" target="_blank" rel="noopener">Giấy phép Arphic</a>.</p>`
-          : phase === 'finished' ? `<div class="ink-cover ink-cover--reward" data-cinema-stage>${selected.map(item => `<span lang="zh-Hans">${esc(item.hanzi)}</span>`).join('')}</div>
+          : phase === 'finished' ? `<div class="ink-cover ink-cover--reward" data-cinema-stage><i aria-hidden="true"></i>${selected.map(item => `<span lang="zh-Hans">${esc(item.hanzi)}</span>`).join('')}</div>
           <p class="ink-score"><strong>${totalScore}</strong> điểm</p>
           <div class="ink-controls"><button type="button" class="btn primary" data-stroke-action="replay" data-stroke-replay>Chơi lại</button>
           <button type="button" class="btn button-soft" data-stroke-action="exit">Về sân chơi</button></div>`
@@ -196,7 +198,7 @@
       }
       position += 1;
       enterDrawing('guide');
-      ctx.motion?.('collect', root.querySelectorAll('.ink-seal--lit')[position - 1]);
+      ctx.motion?.('collect', root.querySelectorAll('.ink-seal--lit')[position - 1], {glyph: selected[position].hanzi});
     }
 
     function enterDrawing(next) {
@@ -209,6 +211,7 @@
       hadHint = false;
       render();
       focusHeading();
+      ctx.motion?.('round', root.querySelector('[data-stroke-board]'), {glyph: selected[position].hanzi});
     }
 
     function click(event) {
@@ -246,8 +249,17 @@
       ink.setAttribute('class', 'ink-paint');
       const point = fitPoint(svg, event);
       ink.setAttribute('points', pointList([point]));
-      svg.append(ink);
-      pointer = { id: event.pointerId, svg, ink, points: [point] };
+      const nib = document.createElementNS(svgNamespace, 'circle');
+      nib.setAttribute('class', 'ink-nib');
+      placeNib(nib, point, event.pressure);
+      svg.append(ink, nib);
+      pointer = { id: event.pointerId, svg, ink, nib, points: [point] };
+    }
+
+    function placeNib(nib, [x, y], pressure) {
+      nib.setAttribute('cx', x);
+      nib.setAttribute('cy', y);
+      nib.setAttribute('r', 11 + 13 * pressure);
     }
 
     function moveStroke(event) {
@@ -256,6 +268,7 @@
       if (distance(pointer.points.at(-1), point) < 4 || pointer.points.length >= 512) return;
       pointer.points.push(point);
       pointer.ink.setAttribute('points', pointList(pointer.points));
+      placeNib(pointer.nib, point, event.pressure);
     }
 
     function closePointer(event) {
@@ -265,6 +278,7 @@
       if (trace.svg.hasPointerCapture(trace.id)) trace.svg.releasePointerCapture(trace.id);
       if (event.type !== 'pointerup') {
         trace.ink.remove();
+        trace.nib.remove();
         return;
       }
 
@@ -283,7 +297,8 @@
       }
       render();
       const board = root.querySelector('[data-stroke-board]');
-      const ink = {x: last[0] / 1024, y: last[1] / 1024};
+      const ink = {x: last[0] / 1024, y: last[1] / 1024, index: stroke,
+        progress: stroke / glyph.medians.length, glyph: selected[position].hanzi};
       if (outcome !== 'good') {
         ctx.motion?.('miss', board, ink);
         return;
@@ -294,7 +309,7 @@
         y: (bounds.top + firstY / 1024 * bounds.height) / window.innerHeight};
       board.classList.add('ink-board--wet');
       ctx.motion?.('ink', board, {...ink, from});
-      if (effect) ctx.motion?.('seal', board);
+      if (effect) ctx.motion?.('seal', root.querySelector('.ink-stamped'), ink);
     }
 
     root.addEventListener('click', click);

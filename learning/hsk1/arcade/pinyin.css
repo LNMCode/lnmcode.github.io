@@ -1,83 +1,157 @@
 .pinyin-game {
-  --pinyin-blue: #96dae9;
+  --observatory-blue: #b4e4ff;
+  --observatory-brass: #f2ca80;
   display: grid;
-  gap: 12px;
+  gap: .65rem;
   color: var(--ink);
 }
 
-.pinyin-game [hidden] {
-  display: none !important;
-}
+.pinyin-game [hidden] { display: none !important; }
 
 .pinyin-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
+  gap: .55rem;
 }
 
 .pinyin-header p {
-  color: var(--muted);
-  font-size: .875rem;
-  margin-top: 4px;
+  color: #d4dff2;
+  font-size: .9rem;
+  line-height: 1.4;
 }
 
 .pinyin-pause {
-  min-height: 44px;
-  padding: 6px 10px;
-  border: 1px solid #456176;
-  border-radius: 10px;
-  background: #17283a;
   flex: none;
-  font-size: .8125rem;
+  min-height: 44px;
+  padding: .4rem .65rem;
+  border: 1px solid #655b68;
+  border-radius: .65rem;
+  background: #232538;
+  color: #f2e3c9;
+  font-size: .85rem;
   font-weight: 750;
 }
 
-.pinyin-hud {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
-}
-
-.pinyin-hud > div {
-  border: 1px solid #31445c;
-  border-radius: 12px;
-  background: #152235;
-  padding: 6px 8px;
-  text-align: center;
-}
-
-.pinyin-hud span {
-  display: block;
-  color: #bacbdc;
-  font-size: .75rem;
-}
-
-.pinyin-hud strong {
-  display: block;
-  color: var(--pinyin-blue);
-  font-size: 1.125rem;
-  font-variant-numeric: tabular-nums;
-}
-
 .pinyin-sky {
+  position: relative;
   isolation: isolate;
   overflow: hidden;
-  position: relative;
-  min-height: 170px;
-  height: clamp(170px, 34svh, 292px);
-  border: 1px solid #38506a;
-  border-radius: 16px;
+  height: clamp(202px, 52vw, 300px);
+  border: 1px solid #947967;
+  border-bottom: 4px solid #463d51;
+  border-radius: 1.1rem;
   background:
-    radial-gradient(ellipse at 35% 8%, #233a6caa 1%, transparent 50%),
-    radial-gradient(circle at 67% 71%, #1c697b87 0, transparent 40%),
-    radial-gradient(circle at 10% 24%, #bbdeff 0 1px, transparent 2px),
-    radial-gradient(circle at 52% 82%, #bbdeff 0 1px, transparent 2px),
-    radial-gradient(circle at 77% 20%, #bbdeff 0 1px, transparent 2px),
-    radial-gradient(circle at 38% 12%, #bbdeff 0 1px, transparent 2px),
-    radial-gradient(circle at 89% 83%, #bbdeff 0 1px, transparent 2px),
-    radial-gradient(circle at 15% 78%, #bbdeff 0 1px, transparent 2px),
-    linear-gradient(135deg, #0d1728, #081123);
+    radial-gradient(ellipse at 50% 83%, #314e84 0, transparent 50%),
+    radial-gradient(circle at 15% 33%, #f2dcac 0 1px, transparent 2px),
+    radial-gradient(circle at 85% 29%, #c9e8fc 0 1px, transparent 2px),
+    radial-gradient(circle at 8% 67%, #c9e8fc 0 1px, transparent 2px),
+    radial-gradient(circle at 56% 19%, #dfbda4 0 1px, transparent 2px),
+    radial-gradient(circle at 90% 70%, #dfbda4 0 1px, transparent 2px),
+    linear-gradient(137deg, #24254a, #10172e 64%, #29233f);
+  box-shadow: 0 8px 16px #070b1885, inset 0 0 0 4px #0a10264d;
+}
+
+.pinyin-sky::before {
+  content: "";
+  position: absolute;
+  inset: 9px;
+  z-index: -1;
+  border: 1px solid #d4b28f36;
+  border-radius: .65rem;
+  background:
+    linear-gradient(90deg, transparent calc(50% - .5px), #a7c5f320 50%, transparent calc(50% + .5px)),
+    linear-gradient(transparent calc(50% - .5px), #a7c5f31a 50%, transparent calc(50% + .5px));
+  pointer-events: none;
+}
+
+.pinyin-dials {
+  position: absolute;
+  z-index: -1;
+  inset: 12% 7% 3%;
+  overflow: hidden;
+  transform: rotate(-10deg);
+  pointer-events: none;
+}
+
+.pinyin-dials i {
+  position: absolute;
+  inset: 12% 2%;
+  border-radius: 50%;
+  border: 1px solid #e1bd884a;
+}
+
+.pinyin-dials i:nth-child(2) {
+  inset: 28% 9%;
+  border-style: dashed;
+  transform: rotate(30deg);
+}
+
+.pinyin-dials i:nth-child(3) {
+  inset: 21% 18%;
+  border-color: #a9c9f04e;
+  transform: rotate(-36deg);
+}
+
+.pinyin-arc {
+  position: absolute;
+  z-index: -1;
+  left: 50%;
+  top: 89%;
+  width: 112%;
+  height: 58%;
+  translate: -50% -50%;
+  rotate: -8deg;
+  border-top: 1px solid #f3c78a6e;
+  border-radius: 50%;
+  box-shadow: 0 -8px 38px #89bbef23;
+  pointer-events: none;
+}
+
+.pinyin-observatory-readout {
+  position: absolute;
+  z-index: 2;
+  top: .72rem;
+  left: .72rem;
+  display: flex;
+  gap: .45rem;
+  align-items: center;
+  max-width: calc(100% - 1.44rem);
+  padding: .35rem .48rem;
+  border: 1px solid #b2bfe03b;
+  border-radius: .4rem;
+  background: #171b30e8;
+  color: #e1e8fa;
+  font-size: .75rem;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.pinyin-observatory-readout strong { color: var(--observatory-brass); }
+
+.pinyin-phase-lights {
+  display: flex;
+  gap: 4px;
+  margin-left: 1px;
+}
+
+.pinyin-phase-lights i {
+  width: 5px;
+  aspect-ratio: 1;
+  transform: rotate(45deg);
+  background: #737e9d;
+}
+
+.pinyin-phase-lights i.is-current {
+  background: #ffe3a4;
+  box-shadow: 0 0 .5rem #f6be72;
+}
+
+.pinyin-phase-lights i.is-complete { background: #98f2ce; }
+
+.pinyin-sky.is-complete {
+  border-color: #b5dbbc;
+  box-shadow: 0 7px 14px #080f1d90, inset 0 0 36px #a2e8bb27;
 }
 
 .pinyin-constellation,
@@ -88,17 +162,15 @@
   height: 100%;
 }
 
-.pinyin-constellation {
-  pointer-events: none;
-}
+.pinyin-constellation { pointer-events: none; }
 
 .pinyin-constellation line {
-  stroke: #a6eafd;
-  stroke-width: 1.5;
+  stroke: #ffe39e;
+  stroke-width: 2.2;
   stroke-linecap: round;
-  opacity: .72;
-  filter: drop-shadow(0 0 3px #68c5fa);
-  animation: pinyin-connect .55s ease-out both;
+  stroke-dasharray: 1;
+  filter: drop-shadow(0 0 5px #f7b67b);
+  animation: pinyin-connect .48s cubic-bezier(.16,.85,.23,1) both;
 }
 
 .pinyin-target {
@@ -106,186 +178,227 @@
   top: var(--pinyin-y);
   left: var(--pinyin-x);
   transform: translate(-50%, -50%);
-  min-width: 66px;
-  min-height: 69px;
+  width: max-content;
+  min-width: min(58px, 24%);
+  min-height: 65px;
   max-width: 29%;
   padding: 4px;
-  border-radius: 15px;
   border: 0;
-  background: transparent;
-  color: #e4faff;
+  background: none;
+  color: #dcecff;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .pinyin-star {
-  display: flex;
+  position: relative;
+  display: grid;
   align-items: center;
-  justify-content: center;
-  min-height: 57px;
-  padding: 0 6px;
-  border-radius: 15px;
-  border: 1px solid #547c9a;
-  background: radial-gradient(circle at 36% 30%, #234b62, #14243f 80%);
-  box-shadow: 0 0 17px #398da52a, inset 0 0 16px #83d9fa10;
-  animation: pinyin-drift 4.8s var(--pinyin-delay) ease-in-out infinite;
+  min-height: 56px;
+  padding: 2px .5rem;
+  border: 1px solid #91b5db;
+  border-bottom: 3px solid #38516f;
+  border-radius: .68rem;
+  background: linear-gradient(153deg, #36587c, #172b4d 71%);
+  box-shadow: 0 5px 10px #060b22b8, inset 0 0 0 3px #becfef15;
+  animation: pinyin-star-enter .5s var(--pinyin-delay) cubic-bezier(.2,.8,.3,1.1) both;
 }
 
-.pinyin-target[aria-pressed="true"] {
-  z-index: 1;
+.pinyin-star::before,
+.pinyin-star::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  width: 7px;
+  aspect-ratio: 1;
+  border: 1px solid #89a9c8;
+  background: #293d61;
+  rotate: 45deg;
+  translate: -50%;
 }
+
+.pinyin-star::before { top: -5px; }
+.pinyin-star::after { bottom: -6px; }
+
+.pinyin-target[aria-pressed="true"] { z-index: 1; }
 
 .pinyin-target[aria-pressed="true"] .pinyin-star {
-  border-color: #acecff;
-  box-shadow: 0 0 0 3px #8cdcf63a, 0 0 25px #80e4ed54;
+  color: #fff4d1;
+  border-color: #ffe1a3;
+  border-bottom-color: #a57c58;
+  background: linear-gradient(137deg, #675471, #323b63 72%);
+  box-shadow: 0 0 0 3px #f5c99235, 0 0 24px #bba08468, inset 0 0 0 3px #f6c8792a;
 }
 
-.pinyin-target.is-struck {
-  opacity: 1;
+.pinyin-target[aria-pressed="true"] .pinyin-star::before,
+.pinyin-target[aria-pressed="true"] .pinyin-star::after,
+.pinyin-target.is-connected .pinyin-star::before,
+.pinyin-target.is-connected .pinyin-star::after {
+  background: #ffda96;
+  border-color: #ffffc8;
+  box-shadow: 0 0 .65rem #e9a25f;
 }
+
+.pinyin-target.is-struck,
+.pinyin-target.is-cleared { opacity: 1; }
 
 .pinyin-target.is-struck .pinyin-star {
-  animation-play-state: paused;
-  background: #e0ffff;
-  color: #133949;
-  box-shadow: 0 0 36px #8cf7ffda;
-  transition: background .2s .22s, color .2s .22s, box-shadow .2s .22s;
-}
-
-.pinyin-target.is-cleared {
-  opacity: .44;
-  color: #97e0d6;
+  animation: pinyin-impact .44s .19s cubic-bezier(.2,.8,.22,1) both;
 }
 
 .pinyin-target.is-cleared .pinyin-star {
-  border: 1px dashed #67c4c4;
-  background: #101e32;
+  border: 1px dashed #8a97ac;
+  opacity: .55;
   animation: none;
 }
 
-.pinyin-target.is-missed .pinyin-glyph {
-  animation: pinyin-tremor .35s ease;
+.pinyin-target.is-cleared.is-connected .pinyin-star {
+  opacity: 1;
+  color: #342a42;
+  border: 1px solid #ffe9ad;
+  background: linear-gradient(145deg, #ffeec4, #e0b37e);
+  box-shadow: 0 0 12px #efb6737d;
 }
 
+.pinyin-target.is-missed .pinyin-glyph { animation: pinyin-tremor .33s ease; }
+
 .pinyin-glyph {
-  display: inline-block;
-  font: 800 clamp(1.125rem, 5.5vw, 1.7rem)/1.2 var(--zh);
+  display: block;
+  font: 800 clamp(1.13rem, 5.4vw, 1.7rem)/1.2 var(--zh);
   overflow-wrap: anywhere;
 }
 
 .pinyin-origin {
-  pointer-events: none;
   position: absolute;
   top: 88%;
   left: 50%;
-  width: 44px;
-  height: 12px;
+  width: clamp(35px, 12%, 54px);
+  height: 20px;
   transform: translate(-50%, -50%);
-  border: 1px solid #6cb7db;
+  border: 1px solid #ffffb6;
   border-radius: 50%;
-  box-shadow: 0 0 15px #50c4ff9c, inset 0 0 8px #5fc0eda1;
+  background: #aa825a6a;
+  box-shadow: 0 4px 0 #674d4d, 0 0 18px #ffe1a375, inset 0 0 8px #f9d48ef0;
+  pointer-events: none;
+}
+
+.pinyin-origin i {
+  position: absolute;
+  inset: -11px 33% 30%;
+  border: 1px solid #ffffc9;
+  border-radius: 50%;
+  background: radial-gradient(circle at 25% 20%, #ffffd3, #e7a966 65%, #845953);
+  box-shadow: 0 0 1rem #e7ac6b9c;
 }
 
 .pinyin-pulse {
   position: absolute;
   z-index: 2;
-  pointer-events: none;
   top: 88%;
   left: 50%;
-  width: 13px;
-  height: 13px;
+  width: 10px;
+  aspect-ratio: 1;
   border-radius: 50%;
-  background: #e8ffff;
-  box-shadow: 0 0 9px 3px #9eecf4, 0 0 26px 10px #40c8ff94;
-  animation: pinyin-flight .46s ease-in forwards;
+  background: #ffffe1;
+  box-shadow: 0 0 5px 3px #ffda94, 0 0 22px 9px #fbc296b5;
+  animation: pinyin-flight .54s cubic-bezier(.25,.16,.36,1) both;
+  pointer-events: none;
 }
 
 .pinyin-paused {
   position: absolute;
-  z-index: 2;
+  z-index: 3;
   inset: 0;
   display: grid;
   place-items: center;
   margin: 0;
+  padding: 1rem;
+  background: #101931df;
   text-align: center;
-  background: #081525cb;
+  font-size: 1.1rem;
   font-weight: 780;
 }
 
-.is-paused .pinyin-star {
-  animation-play-state: paused;
+.pinyin-hud {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: .5rem;
+  margin-inline: 2px;
+  color: #cfdbef;
+  font-size: .85rem;
+}
+
+.pinyin-hud > div { display: flex; align-items: baseline; gap: .42rem; }
+
+.pinyin-hud strong {
+  color: var(--observatory-brass);
+  font-size: 1.1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.pinyin-play {
+  padding: .65rem;
+  border: 1px solid #4f5270;
+  border-radius: .95rem;
+  background: linear-gradient(155deg, #252b45, #1b2036 74%);
+  box-shadow: inset 0 1px #cad6f021;
 }
 
 .pinyin-form > label {
   display: block;
-  color: var(--pinyin-blue);
-  font-size: .875rem;
+  margin-bottom: .4rem;
+  color: var(--observatory-blue);
+  font-size: .9rem;
   font-weight: 750;
-  margin-bottom: 5px;
 }
 
 .pinyin-type,
-.pinyin-actions {
-  display: flex;
-  gap: 8px;
-}
+.pinyin-actions { display: flex; gap: .45rem; }
 
 .pinyin-type input {
-  width: 0;
   flex: 1;
   min-width: 0;
-  padding: 10px 12px;
-  border: 1px solid #547c9a;
-  border-radius: 13px;
-  background: #111e30;
+  width: 0;
+  padding: .65rem .7rem;
+  border: 1px solid #7385ad;
+  border-radius: .63rem;
+  background: #11192e;
+  box-shadow: inset 0 2px 5px #090c1c;
   color: var(--ink);
   font-size: 16px;
 }
 
-.pinyin-type input::placeholder {
-  color: #a8bfd4;
-}
-
-.pinyin-type > button {
-  flex: none;
-}
+.pinyin-type input::placeholder { color: #aab9d7; }
+.pinyin-type > button { flex: none; padding-inline: .75rem; }
 
 .pinyin-status {
-  min-height: 3.9em;
-  padding-top: 8px;
-  color: #bacbdc;
-  font-size: .875rem;
+  min-height: 3.75em;
+  padding-top: .65rem;
+  color: #c7d3e7;
+  font-size: .9rem;
+  line-height: 1.4;
 }
 
-.pinyin-status[data-tone="hit"] {
-  color: #aef7dd;
-}
+.pinyin-status[data-tone="hit"] { color: #bcf9df; }
+.pinyin-status[data-tone="learn"] { color: #ffe0a9; }
 
-.pinyin-status[data-tone="learn"] {
-  color: #ffda9d;
-}
-
-.pinyin-actions button {
-  flex: 1;
-  padding-inline: 8px;
-  font-size: .875rem;
-}
+.pinyin-actions button { flex: 1; padding-inline: .4rem; font-size: .875rem; }
 
 .pinyin-result {
   display: grid;
   justify-items: start;
-  gap: 10px;
-  border-radius: 14px;
-  border: 1px solid #38506a;
-  background: #152235;
-  padding: 16px;
+  gap: .55rem;
+  padding: .85rem;
+  border: 1px solid #997f69;
+  border-radius: .95rem;
+  background: linear-gradient(150deg, #37314d, #20273e);
 }
 
-.pinyin-result p {
-  color: var(--pinyin-blue);
-}
+.pinyin-result p { color: var(--observatory-blue); }
 
-@keyframes pinyin-drift {
-  0%, 100% { transform: translate(-3px, 3px); }
-  50% { transform: translate(5px, -5px); }
+@keyframes pinyin-star-enter {
+  from { opacity: 0; transform: translateY(12px) scale(.73) rotate(-8deg); }
+  to { opacity: 1; transform: none; }
 }
 
 @keyframes pinyin-tremor {
@@ -295,28 +408,28 @@
 }
 
 @keyframes pinyin-flight {
-  0% { transform: translate(-50%, -50%); opacity: .75; }
-  68% { transform: translate(-50%, -50%) translate(var(--pinyin-flight-x), var(--pinyin-flight-y)); opacity: 1; }
-  100% { transform: translate(-50%, -50%) translate(var(--pinyin-flight-x), var(--pinyin-flight-y)) scale(2.4); opacity: 0; }
+  0% { transform: translate(-50%, -50%) scale(.5); opacity: .7; }
+  64% { transform: translate(-50%, -50%) translate(var(--pinyin-flight-x), var(--pinyin-flight-y)) scale(1); opacity: 1; }
+  100% { transform: translate(-50%, -50%) translate(var(--pinyin-flight-x), var(--pinyin-flight-y)) scale(3.5); opacity: 0; }
+}
+
+@keyframes pinyin-impact {
+  0% { transform: scale(1); filter: brightness(1); }
+  54% { transform: scale(1.13); filter: brightness(2.6); }
+  100% { transform: scale(1); filter: brightness(1.3); }
 }
 
 @keyframes pinyin-connect {
-  from { opacity: .12; }
-  38% { opacity: 1; }
-  to { opacity: .72; }
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
 }
 
-.pinyin-reduced .pinyin-star,
-.pinyin-reduced .pinyin-glyph,
-.pinyin-reduced .pinyin-constellation line {
-  animation: none;
+.pinyin-reduced :is(.pinyin-star, .pinyin-glyph, .pinyin-pulse, .pinyin-constellation line) {
+  animation: none !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pinyin-star,
-  .pinyin-glyph,
-  .pinyin-pulse,
-  .pinyin-constellation line {
-    animation: none;
+  .pinyin-game :is(.pinyin-star, .pinyin-glyph, .pinyin-pulse, .pinyin-constellation line) {
+    animation: none !important;
   }
 }
