@@ -1,0 +1,170 @@
+.arcade-home-link {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  margin-top: 14px;
+  color: #fff0d9;
+  text-align: left;
+  border: 1px solid #98704a;
+  border-radius: 17px;
+  background: radial-gradient(ellipse at 0 50%, #4a3127, #202532 72%);
+}
+.arcade-home-link strong, .arcade-home-link small {
+  display: block;
+}
+.arcade-home-link small {
+  margin-top: 1px;
+  color: #dcc9ac;
+  font-size: .82rem;
+}
+.arcade-home-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid #65513e;
+  border-radius: 13px;
+  color: #ffd790;
+  background: #302821;
+}
+.arcade-lobby-title {
+  margin-bottom: 16px;
+}
+.arcade-lobby-title h1 {
+  margin-bottom: 4px;
+}
+.arcade-lobby-title p {
+  color: var(--muted);
+}
+.arcade-grid {
+  display: grid;
+  gap: 12px;
+}
+.arcade-card {
+  --tint: #92e8ee;
+  --terrain: #183442;
+  --shadow-tone: #122128;
+  display: grid;
+  grid-template-columns: minmax(57px, 23%) minmax(0, 1fr) 30px;
+  align-items: center;
+  gap: 11px;
+  min-height: 119px;
+  width: 100%;
+  overflow: hidden;
+  padding: 9px 12px 9px 9px;
+  border: 1px solid #465568;
+  border-color: color-mix(in srgb, var(--tint) 35%, #17202e);
+  border-radius: 18px;
+  background: linear-gradient(105deg, var(--terrain), var(--shadow-tone) 57%, #111d28);
+  color: var(--ink);
+  text-align: left;
+}
+.arcade-card:focus-visible {
+  outline-offset: 3px;
+}
+.arcade-card-strokes {
+  --tint: #ffcf97;
+  --terrain: #4a312a;
+  --shadow-tone: #29232a;
+}
+.arcade-card-pairs {
+  --tint: #f0b8db;
+  --terrain: #3f2b45;
+  --shadow-tone: #2c253d;
+}
+.arcade-card-flow {
+  --tint: #9de6b8;
+  --terrain: #1a3a36;
+  --shadow-tone: #172d2e;
+}
+.arcade-card-art {
+  position: relative;
+  align-self: stretch;
+  isolation: isolate;
+  display: grid;
+  place-items: center;
+  min-height: 84px;
+  border-radius: 12px;
+  color: var(--tint);
+  background:
+    radial-gradient(circle at 27% 22%, var(--tint) 0 1px, transparent 2px),
+    radial-gradient(circle at 75% 79%, var(--tint) 0 1px, transparent 2px),
+    radial-gradient(ellipse, var(--terrain), #0b1621);
+  box-shadow: inset 0 0 0 1px #d1e8e61c;
+}
+.arcade-card-art::before {
+  z-index: -1;
+  position: absolute;
+  width: 58%;
+  aspect-ratio: 1;
+  content: "";
+  border: 1px solid currentColor;
+  opacity: .48;
+  border-radius: var(--glyph-radius, 34%);
+  transform: rotate(var(--glyph-angle, 42deg));
+}
+.arcade-card-strokes .arcade-card-art { --glyph-radius: 2px; --glyph-angle: -11deg; }
+.arcade-card-pairs .arcade-card-art { --glyph-radius: 15%; --glyph-angle: 16deg; }
+.arcade-card-flow .arcade-card-art { --glyph-radius: 51% 15% 51% 15%; --glyph-angle: 26deg; }
+.arcade-card-art .zh {
+  font-size: clamp(1.8rem, 6vw, 3rem);
+  text-shadow: 0 0 15px color-mix(in srgb, var(--tint) 45%, transparent);
+}
+.arcade-card-copy {
+  min-width: 0;
+}
+.arcade-card-copy > * {
+  display: block;
+}
+.arcade-card-copy strong {
+  font-size: 1.19rem;
+}
+.arcade-card-copy > span {
+  margin-top: 3px;
+  color: #d5e1e9;
+  font-size: .87rem;
+  line-height: 1.35;
+}
+.arcade-card-copy small {
+  margin-top: 6px;
+  color: var(--tint);
+  font-size: .76rem;
+  font-weight: 700;
+}
+.arcade-card-play {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  color: var(--tint);
+  background: #06101976;
+}
+.arcade-card-play svg { width: 17px; }
+.arcade-main { padding-bottom: calc(22px + env(safe-area-inset-bottom, 0px)); }
+.arcade-game-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 12px;
+  padding: 8px 0 14px;
+}
+.arcade-game-header .back-link {
+  margin: 0;
+  white-space: nowrap;
+}
+.arcade-game-header h1 {
+  margin: 0;
+  font-size: 1.45rem;
+}
+.arcade-game-header h1:focus { outline: none; }
+@media (hover: hover) {
+  .arcade-card:hover { border-color: var(--tint); }
+}
+@media (max-width: 345px) {
+  .arcade-card { grid-template-columns: 57px minmax(0, 1fr) 25px; gap: 8px; }
+  .arcade-card-play { width: 25px; height: 25px; }
+}

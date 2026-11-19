@@ -24,6 +24,7 @@ const DAY = 1440 * MIN;
 const MAX_INTERVAL = 240 * 1440;
 const MAX_QUEUE = 120;
 const HISTORY_LIMIT = 12;
+const ARCADE_GAMES = ['pinyin', 'strokes', 'pairs', 'flow'];
 const MIN_TRAIL_SPOTS = 3;
 const MAX_TRAIL_SPOTS = 5;
 const IMAGE_WORDS = new Set(['书', '车', '电脑', '手机', '米饭', '面条', '鸡蛋', '面包',
@@ -75,7 +76,28 @@ function fresh() {
   const now = Date.now();
   return {schema: 3, createdAt: now, savedAt: now, entries: {}, completed: [], active: null,
     preferences: {audio: false, lowMotion: false, viewPinyin: false, sessionSize: 10},
-    stats: {sessions: 0, answers: 0}};
+    stats: {sessions: 0, answers: 0}, arcade: {}};
+}
+
+function normalizeArcade(raw) {
+  const arcade = {};
+  for (const id of ARCADE_GAMES) {
+    const record = raw?.[id];
+    if (!isRecord(record) || !count(record.played)) continue;
+    const last = Math.min(999999, count(record.last));
+    const best = Math.max(last, Math.min(999999, count(record.best)));
+    arcade[id] = {played: Math.min(999999, count(record.played)), last, best};
+  }
+  return arcade;
+}
+
+function recordArcade(state, id, score) {
+  if (!ARCADE_GAMES.includes(id) || !Number.isFinite(score) || score < 0) return;
+  const previous = state.arcade[id] || {played: 0, best: 0};
+  const last = Math.min(999999, Math.floor(score));
+  state.arcade[id] = {played: Math.min(999999, previous.played + 1),
+    last, best: Math.max(previous.best, last)};
+  save(state);
 }
 
 function normalizeHistory(raw) {
@@ -266,6 +288,7 @@ function normalize(raw, permitUnversionedLegacy = false) {
     viewPinyin: preferences?.viewPinyin === true,
     sessionSize: [5, 10, 20].includes(preferences?.sessionSize) ? preferences.sessionSize : 10};
   state.stats = {sessions: count(raw.stats?.sessions), answers: count(raw.stats?.answers)};
+  state.arcade = normalizeArcade(raw.arcade);
   state.active = legacy ? null : normalizeActive(raw.active, state);
   return state;
 }
@@ -762,5 +785,5 @@ function practiceWord(state, id) {
 window.HSK_ENGINE = {D, W, M, R, S, ST, KEY, SKILLS, DIALOGUES, shuffle, load, save, normalize,
   fresh, see, ensure, grade, dueFor, mastered, stateOf, dueItems, stats, matchPinyin, choicesFor,
   hanziChoices, sentenceFor, sentenceTasks, sampleCloze, blankWord, passageFor, missionQueue, reviewQueue,
-  adventureQueue, trailState, visitTrail, practiceWord, taskFor, storageHealthy: () => storageHealthy};
+  adventureQueue, trailState, visitTrail, practiceWord, taskFor, recordArcade, storageHealthy: () => storageHealthy};
 })();

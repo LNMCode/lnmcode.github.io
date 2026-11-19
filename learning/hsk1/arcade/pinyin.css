@@ -1,0 +1,305 @@
+.pinyin-game {
+  --pinyin-blue: #96dae9;
+  display: grid;
+  gap: 12px;
+  color: var(--ink);
+}
+
+.pinyin-game [hidden] {
+  display: none !important;
+}
+
+.pinyin-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.pinyin-header p {
+  color: var(--muted);
+  font-size: .875rem;
+  margin-top: 4px;
+}
+
+.pinyin-pause {
+  min-height: 44px;
+  padding: 6px 10px;
+  border: 1px solid #456176;
+  border-radius: 10px;
+  background: #17283a;
+  flex: none;
+  font-size: .8125rem;
+  font-weight: 750;
+}
+
+.pinyin-hud {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.pinyin-hud > div {
+  border: 1px solid #31445c;
+  border-radius: 12px;
+  background: #152235;
+  padding: 6px 8px;
+  text-align: center;
+}
+
+.pinyin-hud span {
+  display: block;
+  color: #bacbdc;
+  font-size: .75rem;
+}
+
+.pinyin-hud strong {
+  display: block;
+  color: var(--pinyin-blue);
+  font-size: 1.125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.pinyin-sky {
+  isolation: isolate;
+  overflow: hidden;
+  position: relative;
+  min-height: 170px;
+  height: clamp(170px, 34svh, 292px);
+  border: 1px solid #38506a;
+  border-radius: 16px;
+  background:
+    radial-gradient(ellipse at 35% 8%, #233a6caa 1%, transparent 50%),
+    radial-gradient(circle at 67% 71%, #1c697b87 0, transparent 40%),
+    radial-gradient(circle at 10% 24%, #bbdeff 0 1px, transparent 2px),
+    radial-gradient(circle at 52% 82%, #bbdeff 0 1px, transparent 2px),
+    radial-gradient(circle at 77% 20%, #bbdeff 0 1px, transparent 2px),
+    radial-gradient(circle at 38% 12%, #bbdeff 0 1px, transparent 2px),
+    radial-gradient(circle at 89% 83%, #bbdeff 0 1px, transparent 2px),
+    radial-gradient(circle at 15% 78%, #bbdeff 0 1px, transparent 2px),
+    linear-gradient(135deg, #0d1728, #081123);
+}
+
+.pinyin-sky canvas,
+.pinyin-targets {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.pinyin-sky canvas {
+  pointer-events: none;
+}
+
+.pinyin-target {
+  position: absolute;
+  top: var(--pinyin-y);
+  left: var(--pinyin-x);
+  transform: translate(-50%, -50%);
+  min-width: 66px;
+  min-height: 69px;
+  max-width: 29%;
+  padding: 4px;
+  border-radius: 15px;
+  border: 0;
+  background: transparent;
+  color: #e4faff;
+}
+
+.pinyin-star {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 57px;
+  padding: 0 6px;
+  border-radius: 15px;
+  border: 1px solid #547c9a;
+  background: radial-gradient(circle at 36% 30%, #234b62, #14243f 80%);
+  box-shadow: 0 0 17px #398da52a, inset 0 0 16px #83d9fa10;
+  animation: pinyin-drift 4.8s var(--pinyin-delay) ease-in-out infinite;
+}
+
+.pinyin-target[aria-pressed="true"] {
+  z-index: 1;
+}
+
+.pinyin-target[aria-pressed="true"] .pinyin-star {
+  border-color: #acecff;
+  box-shadow: 0 0 0 3px #8cdcf63a, 0 0 25px #80e4ed54;
+}
+
+.pinyin-target.is-struck {
+  opacity: 1;
+}
+
+.pinyin-target.is-struck .pinyin-star {
+  animation-play-state: paused;
+  background: #e0ffff;
+  color: #133949;
+  box-shadow: 0 0 36px #8cf7ffda;
+  transition: background .2s .22s, color .2s .22s, box-shadow .2s .22s;
+}
+
+.pinyin-target.is-cleared {
+  opacity: .44;
+  color: #97e0d6;
+}
+
+.pinyin-target.is-cleared .pinyin-star {
+  border: 1px dashed #67c4c4;
+  background: #101e32;
+  animation: none;
+}
+
+.pinyin-target.is-missed .pinyin-glyph {
+  animation: pinyin-tremor .35s ease;
+}
+
+.pinyin-glyph {
+  display: inline-block;
+  font: 800 clamp(1.125rem, 5.5vw, 1.7rem)/1.2 var(--zh);
+  overflow-wrap: anywhere;
+}
+
+.pinyin-origin {
+  pointer-events: none;
+  position: absolute;
+  top: 88%;
+  left: 50%;
+  width: 44px;
+  height: 12px;
+  transform: translate(-50%, -50%);
+  border: 1px solid #6cb7db;
+  border-radius: 50%;
+  box-shadow: 0 0 15px #50c4ff9c, inset 0 0 8px #5fc0eda1;
+}
+
+.pinyin-pulse {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  top: 88%;
+  left: 50%;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #e8ffff;
+  box-shadow: 0 0 9px 3px #9eecf4, 0 0 26px 10px #40c8ff94;
+  animation: pinyin-flight .46s ease-in forwards;
+}
+
+.pinyin-paused {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  text-align: center;
+  background: #081525cb;
+  font-weight: 780;
+}
+
+.is-paused .pinyin-star {
+  animation-play-state: paused;
+}
+
+.pinyin-form > label {
+  display: block;
+  color: var(--pinyin-blue);
+  font-size: .875rem;
+  font-weight: 750;
+  margin-bottom: 5px;
+}
+
+.pinyin-type,
+.pinyin-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.pinyin-type input {
+  width: 0;
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #547c9a;
+  border-radius: 13px;
+  background: #111e30;
+  color: var(--ink);
+  font-size: 16px;
+}
+
+.pinyin-type input::placeholder {
+  color: #a8bfd4;
+}
+
+.pinyin-type > button {
+  flex: none;
+}
+
+.pinyin-status {
+  min-height: 3.9em;
+  padding-top: 8px;
+  color: #bacbdc;
+  font-size: .875rem;
+}
+
+.pinyin-status[data-tone="hit"] {
+  color: #aef7dd;
+}
+
+.pinyin-status[data-tone="learn"] {
+  color: #ffda9d;
+}
+
+.pinyin-actions button {
+  flex: 1;
+  padding-inline: 8px;
+  font-size: .875rem;
+}
+
+.pinyin-result {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+  border-radius: 14px;
+  border: 1px solid #38506a;
+  background: #152235;
+  padding: 16px;
+}
+
+.pinyin-result p {
+  color: var(--pinyin-blue);
+}
+
+@keyframes pinyin-drift {
+  0%, 100% { transform: translate(-3px, 3px); }
+  50% { transform: translate(5px, -5px); }
+}
+
+@keyframes pinyin-tremor {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-3px); }
+  75% { transform: translateX(3px); }
+}
+
+@keyframes pinyin-flight {
+  0% { transform: translate(-50%, -50%); opacity: .75; }
+  68% { transform: translate(-50%, -50%) translate(var(--pinyin-flight-x), var(--pinyin-flight-y)); opacity: 1; }
+  100% { transform: translate(-50%, -50%) translate(var(--pinyin-flight-x), var(--pinyin-flight-y)) scale(2.4); opacity: 0; }
+}
+
+.pinyin-reduced .pinyin-star,
+.pinyin-reduced .pinyin-glyph {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pinyin-star,
+  .pinyin-glyph,
+  .pinyin-pulse {
+    animation: none;
+  }
+}

@@ -10,6 +10,9 @@ const pages = [
   'https://example.github.io/project/learning/hsk1/',
 ];
 const artworks = ['./art/school.webp', './art/market.webp', './art/river.webp'];
+const arcade = ['catalog.js', 'visual.js', 'strokes.js', 'strokes-data.js', 'pinyin.js',
+  'pairs.js', 'flow.js', 'arcade.css', 'memory-games.css', 'vendor/three.module.min.js',
+  'vendor/three.core.min.js'].map(name => './arcade/' + name);
 
 function localResource(base, reference) {
   const url = new URL(reference, base);
@@ -68,7 +71,8 @@ test('service worker cache theo đường dẫn, giữ cache khác và mở bài
   assert.equal(stores.has(oldCache), false);
   assert.equal(stores.has(otherGame), true);
   assert.equal(stores.has(otherSite), true);
-  for (const reference of ['./', './?from=offline', './index.html', './data.js', './engine.js', './app.js', './styles.css', ...artworks]) {
+  for (const reference of ['./', './?from=offline', './index.html', './data.js', './engine.js',
+    './app.js', './styles.css', ...artworks, ...arcade]) {
     const url = new URL(reference, scope);
     const mode = url.pathname.endsWith('/') ? 'navigate' : 'same-origin';
     const response = await dispatch('fetch', { request: { method: 'GET', url: url.href, mode } });
