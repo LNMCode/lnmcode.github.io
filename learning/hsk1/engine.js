@@ -24,6 +24,8 @@ const DAY = 1440 * MIN;
 const MAX_INTERVAL = 240 * 1440;
 const MAX_QUEUE = 120;
 const HISTORY_LIMIT = 12;
+const MIN_TRAIL_SPOTS = 3;
+const MAX_TRAIL_SPOTS = 5;
 const IMAGE_WORDS = new Set(['书', '车', '电脑', '手机', '米饭', '面条', '鸡蛋', '面包',
   '苹果', '水', '茶', '牛奶', '雪', '狗', '猫']);
 const DIALOGUES = Object.assign(Object.create(null), {
@@ -136,9 +138,12 @@ function restoreOptions(raw, options, answer) {
   return options;
 }
 
-function normalizeTask(task, state) {
+function normalizeTask(task, state, mission) {
   if (!isRecord(task)) return null;
   const {type, wordId, sentenceId, regionId, focusId} = task;
+  if (type === 'trail' && mission && task.missionId === mission.id) {
+    return restoreTrail(task, state, mission);
+  }
   if (type === 'learn' && W[wordId]) return {type, wordId};
   if (type === 'reading' && W[wordId]) return {type, wordId};
   if (type === 'tone' && W[wordId]) {
@@ -165,8 +170,16 @@ function normalizeTask(task, state) {
       new Set(task.tiles.map(tile => tile?.index)).size === sentence.tokens.length &&
       task.tiles.every(tile => Number.isInteger(tile?.index) && sentence.tokens[tile.index] === tile.text)
       ? task.tiles.map(({text, index}) => ({text, index})) : sentenceTiles(sentence);
-    return {type, sentenceId, tiles, focusId: sentence.wordIds.includes(focusId) ? focusId : sentence.wordIds[0],
+    const result = {type, sentenceId, tiles, focusId: sentence.wordIds.includes(focusId) ? focusId : sentence.wordIds[0],
       glossary: glossaryFor(state, [sentence])};
+    if (task.gate === true && mission && canBuild(sentence)) {
+      const gateWord = sentence.wordIds.find(id => mission.wordIds.includes(id));
+      if (gateWord) {
+        result.gate = true;
+        if (!mission.wordIds.includes(result.focusId)) result.focusId = gateWord;
+      }
+    }
+    return result;
   }
   if (type === 'story' && R[regionId]) {
     const question = storyQuestion(state, regionId);
@@ -196,7 +209,8 @@ function normalizeActive(active, state) {
   if (!isRecord(active) || !modes.includes(active.mode) ||
       (active.mode === 'mission' && !M[active.missionId]) ||
       !Array.isArray(active.queue) || active.queue.length > MAX_QUEUE) return null;
-  const tasks = active.queue.map(task => normalizeTask(task, state));
+  const mission = active.mode === 'mission' ? M[active.missionId] : null;
+  const tasks = active.queue.map(task => normalizeTask(task, state, mission));
   const previousIndex = count(active.index);
   const current = tasks[previousIndex];
   const queue = tasks.filter(Boolean);
@@ -217,9 +231,11 @@ function normalizeActive(active, state) {
       if (/^(meaning|reading|usage|hanzi):w\d+$/.test(key)) repeats[key] = Math.min(count(value), 1);
     }
   }
-  return {mode: active.mode, missionId: M[active.missionId] ? active.missionId : null,
+  const result = {mode: active.mode, missionId: M[active.missionId] ? active.missionId : null,
     queue, index, intro: active.mode === 'mission' && active.intro === true, chosen, feedback, repeats,
     hint: active.hint === true, readingInput: text(active.readingInput, 100)};
+  if (current?.type === 'trail') result.trail = trailState(current, active.trail);
+  return result;
 }
 
 function normalize(raw, permitUnversionedLegacy = false) {
@@ -574,6 +590,100 @@ function taskFor(state, id, skill, previous = null) {
   return sampleCloze(state, id, [], previous) || (sentence && buildQuestion(state, sentence, id));
 }
 
+function earlierWordIds(mission) {
+  const index = D.missions.findIndex(item => item.id === mission.id);
+  return D.missions.slice(0, index).reverse().flatMap(item => item.wordIds);
+}
+
+function createTrail(state, mission) {
+  const ids = new Set(mission.wordIds);
+  const earlier = earlierWordIds(mission);
+  const earlierIds = new Set(earlier);
+  const due = dueItems(state, D.words.length * SKILLS.length)
+    .map(item => item.id).filter(id => earlierIds.has(id) && !ids.has(id));
+  const regionalRecall = mission.step % 3 === 0 && ids.size < MAX_TRAIL_SPOTS
+    ? due.find(id => R[mission.regionId].wordIds.includes(id)) : null;
+  if (regionalRecall) ids.add(regionalRecall);
+  for (const id of [...due, ...earlier]) {
+    if (ids.size >= MIN_TRAIL_SPOTS) break;
+    ids.add(id);
+  }
+  const wordIds = shuffle([...ids]);
+  const order = shuffle(wordIds);
+  if (order.every((id, index) => id === wordIds[index])) order.push(order.shift());
+  return {type: 'trail', missionId: mission.id, wordIds, order};
+}
+
+function restoreTrail(raw, state, mission) {
+  const valid = new Set([...mission.wordIds, ...earlierWordIds(mission)]);
+  const wordIds = Array.isArray(raw.wordIds) ? raw.wordIds : [];
+  if (wordIds.length < MIN_TRAIL_SPOTS || wordIds.length > MAX_TRAIL_SPOTS ||
+      new Set(wordIds).size !== wordIds.length || !wordIds.every(id => valid.has(id)) ||
+      !mission.wordIds.every(id => wordIds.includes(id))) {
+    return createTrail(state, mission);
+  }
+  const order = raw.order;
+  if (!Array.isArray(order) || order.length !== wordIds.length ||
+      new Set(order).size !== order.length || !order.every(id => wordIds.includes(id))) {
+    return {type: 'trail', missionId: mission.id, wordIds, order: shuffle(wordIds)};
+  }
+  return {type: 'trail', missionId: mission.id, wordIds, order};
+}
+
+function trailState(task, raw) {
+  const visited = Array.isArray(raw?.visited)
+    ? [...new Set(raw.visited.filter(id => task.wordIds.includes(id)))] : [];
+  const recall = raw?.recall === true && visited.length === task.wordIds.length;
+  const solved = [];
+  if (recall && Array.isArray(raw.solved)) {
+    for (const id of task.order) {
+      if (!raw.solved.includes(id)) break;
+      solved.push(id);
+    }
+  }
+  const pending = recall && solved.length < task.order.length;
+  const missed = pending && task.wordIds.includes(raw.missed) && !solved.includes(raw.missed) &&
+    raw.missed !== task.order[solved.length] ? raw.missed : null;
+  return {visited, solved, recall, missed, hinted: pending && raw.hinted === true,
+    selected: !recall && visited.includes(raw?.selected) ? raw.selected : null};
+}
+
+function visitTrail(task, saved, id) {
+  const progress = trailState(task, saved);
+  const result = {progress, found: false, correct: null};
+  if (!task.wordIds.includes(id) || progress.solved.includes(id)) return result;
+  if (!progress.recall) {
+    progress.selected = id;
+    result.found = !progress.visited.includes(id);
+    if (result.found) progress.visited.push(id);
+    return result;
+  }
+  result.correct = task.order[progress.solved.length] === id;
+  if (result.correct) {
+    progress.solved.push(id);
+    progress.missed = null;
+    progress.hinted = false;
+  } else {
+    progress.missed = id;
+  }
+  return result;
+}
+
+function adventureQueue(state, mission) {
+  const trail = createTrail(state, mission);
+  const configured = S[D.adventureMissions?.[mission.id]?.sentenceId];
+  const candidates = D.sentences.filter(sentence => canBuild(sentence) &&
+    sentence.wordIds.some(id => mission.wordIds.includes(id)));
+  const rank = sentence => glossaryFor(state, [sentence], trail.wordIds).length * 6
+    - sentence.wordIds.filter(id => mission.wordIds.includes(id)).length * 3 + sentence.tokens.length;
+  const preferred = (mission.id === 'm001' && S.bs02) || (mission.id === 'm006' && S.bs09);
+  const passage = candidates.includes(configured) ? configured
+    : candidates.includes(preferred) ? preferred
+    : shuffle(candidates).sort((a, b) => rank(a) - rank(b))[0];
+  const focusId = passage.wordIds.find(id => mission.wordIds.includes(id));
+  return [trail, {...buildQuestion(state, passage, focusId, trail.wordIds), gate: true}];
+}
+
 function missionQueue(state, mission) {
   const ids = mission.wordIds;
   const queue = [];
@@ -652,5 +762,5 @@ function practiceWord(state, id) {
 window.HSK_ENGINE = {D, W, M, R, S, ST, KEY, SKILLS, DIALOGUES, shuffle, load, save, normalize,
   fresh, see, ensure, grade, dueFor, mastered, stateOf, dueItems, stats, matchPinyin, choicesFor,
   hanziChoices, sentenceFor, sentenceTasks, sampleCloze, blankWord, passageFor, missionQueue, reviewQueue,
-  practiceWord, taskFor, storageHealthy: () => storageHealthy};
+  adventureQueue, trailState, visitTrail, practiceWord, taskFor, storageHealthy: () => storageHealthy};
 })();

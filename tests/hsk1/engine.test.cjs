@@ -197,3 +197,114 @@ test('đi hết 72 nhiệm vụ, bài tập có đáp án và từ chưa học c
     assert.ok(taskTypes.has(required), required);
   }
 });
+
+test('đi hết 72 chặng phiêu lưu, tìm đủ 300 từ và có câu mở lối hợp lệ', () => {
+  const { engine, data } = loadGame();
+  const state = engine.fresh();
+  const introduced = new Set();
+
+  for (const mission of data.missions) {
+    const queue = engine.adventureQueue(state, mission);
+    assert.deepEqual(Array.from(queue, (task) => task.type), ['trail', 'build'], mission.id);
+    const [trail, gate] = queue;
+    assert.equal(trail.missionId, mission.id);
+    assert.ok(trail.wordIds.length >= 3 && trail.wordIds.length <= 5, mission.id);
+    assert.equal(new Set(trail.wordIds).size, trail.wordIds.length, mission.id);
+    assert.deepEqual([...trail.order].sort(), [...trail.wordIds].sort(), mission.id);
+    assert.notDeepEqual([...trail.order], [...trail.wordIds], mission.id);
+    assert.ok(mission.wordIds.every((id) => trail.wordIds.includes(id)), mission.id);
+    const available = new Set([...introduced, ...mission.wordIds]);
+    assert.ok(trail.wordIds.every((id) => available.has(id)), mission.id);
+
+    let progress = engine.trailState(trail);
+    for (const id of trail.wordIds) {
+      const visit = engine.visitTrail(trail, progress, id);
+      assert.equal(visit.found, true, mission.id);
+      assert.equal(visit.correct, null, mission.id);
+      progress = visit.progress;
+      engine.see(state, id);
+      introduced.add(id);
+    }
+    progress = engine.trailState(trail, { ...progress, recall: true });
+    for (const id of trail.order) {
+      const visit = engine.visitTrail(trail, progress, id);
+      assert.equal(visit.correct, true, mission.id);
+      progress = visit.progress;
+    }
+    assert.deepEqual([...progress.solved], [...trail.order], mission.id);
+
+    const sentence = engine.S[gate.sentenceId];
+    assert.ok(sentence && gate.gate, mission.id);
+    assert.ok(mission.wordIds.includes(gate.focusId), mission.id);
+    assert.ok(sentence.wordIds.includes(gate.focusId), mission.id);
+    assert.ok(sentence.wordIds.every((id) => introduced.has(id) || gate.glossary.includes(id)), mission.id);
+    assert.deepEqual(Array.from(gate.tiles).sort((a, b) => a.index - b.index).map((tile) => tile.text),
+      [...sentence.tokens], mission.id);
+    if (data.adventureMissions[mission.id]?.sentenceId) {
+      assert.equal(gate.sentenceId, data.adventureMissions[mission.id].sentenceId, mission.id);
+    }
+    engine.grade(state, gate.focusId, 'usage', 'good');
+    state.completed.push(mission.id);
+  }
+
+  assert.equal(introduced.size, 300);
+  assert.equal(engine.stats(state).quests, 72);
+  assert.equal(engine.S[data.adventureMissions.m006.sentenceId].hanzi, '你叫什么名字？');
+});
+
+test('giữ đúng đèn đã khám phá, gợi ý, chỗ đang nhớ và thứ tự thẻ sau khi mở lại', () => {
+  const records = new Map();
+  const { engine, data } = loadGame(records);
+  const state = engine.fresh();
+  const mission = data.missions[0];
+  const queue = engine.adventureQueue(state, mission);
+  const [trail, gate] = queue;
+  const firstSpot = trail.wordIds[0];
+  const firstWord = trail.order[0];
+  const secondWord = trail.order[1];
+
+  let progress = engine.visitTrail(trail, null, firstSpot).progress;
+  const repeated = engine.visitTrail(trail, progress, firstSpot);
+  assert.equal(repeated.found, false);
+  assert.equal(repeated.progress.selected, firstSpot);
+  const premature = engine.trailState(trail, { ...progress, recall: true });
+  assert.equal(premature.recall, false);
+  for (const id of trail.wordIds) progress = engine.visitTrail(trail, progress, id).progress;
+
+  progress = engine.trailState(trail, { ...progress, recall: true, hinted: true });
+  const wrong = engine.visitTrail(trail, progress, secondWord);
+  assert.equal(wrong.correct, false);
+  assert.equal(wrong.progress.missed, secondWord);
+  assert.equal(wrong.progress.hinted, true);
+  assert.equal(wrong.progress.solved.length, 0);
+  const right = engine.visitTrail(trail, wrong.progress, firstWord);
+  assert.equal(right.correct, true);
+  assert.equal(right.progress.missed, null);
+  assert.equal(right.progress.hinted, false);
+
+  state.active = { mode: 'mission', missionId: mission.id, queue, index: 0, trail: right.progress };
+  engine.save(state);
+  const { engine: reloaded } = loadGame(records);
+  const saved = reloaded.load();
+  assert.equal(saved.active.index, 0);
+  assert.deepEqual([...saved.active.queue[0].wordIds], [...trail.wordIds]);
+  assert.deepEqual([...saved.active.queue[0].order], [...trail.order]);
+  assert.deepEqual([...saved.active.trail.solved], [firstWord]);
+  assert.equal(saved.active.trail.visited.length, trail.wordIds.length);
+  assert.equal(saved.active.trail.recall, true);
+  assert.equal(saved.active.queue[1].gate, true);
+
+  const validGateBackup = JSON.parse(JSON.stringify(state));
+  validGateBackup.active.index = 1;
+  validGateBackup.active.chosen = [0];
+  const restoredGate = reloaded.normalize(validGateBackup).active;
+  assert.deepEqual([...restoredGate.chosen], [0]);
+  assert.equal(restoredGate.queue[1].sentenceId, gate.sentenceId);
+
+  const damaged = JSON.parse(JSON.stringify(state));
+  damaged.active.trail.solved = [secondWord, 'bad'];
+  damaged.active.trail.visited.push(firstSpot, 'bad');
+  const cleaned = reloaded.normalize(damaged).active.trail;
+  assert.equal(cleaned.visited.length, trail.wordIds.length);
+  assert.equal(cleaned.solved.length, 0);
+});

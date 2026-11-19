@@ -30,7 +30,25 @@ function saveUnlessUnavailable(nextState){
   return false;
 }
 
-function scene(region,small=false){const r=typeof region==='string'?R[region]:region||D.regions[0];const bg=r.gradient||['#d4efe4','#f8e9bb'];return `<div class="scene ${small?'small':''}" style="--sky:${bg[0]};--ground:${bg[1]}"><svg viewBox="0 0 420 192" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><circle cx="338" cy="37" r="24" fill="#fff4b7" opacity=".95"/><circle cx="353" cy="32" r="30" fill="#fffad9" opacity=".35"/><g fill="#fff" opacity=".75"><ellipse cx="90" cy="42" rx="34" ry="13"/><ellipse cx="68" cy="40" rx="21" ry="15"/><ellipse cx="268" cy="65" rx="28" ry="10"/><ellipse cx="252" cy="61" rx="17" ry="12"/></g><path d="M0 143Q75 90 152 133T298 127T420 120V192H0Z" fill="#96c9ac"/><path d="M0 162Q98 131 180 153T420 142V192H0Z" fill="#6faf9e"/><path d="M172 194Q198 172 214 152Q228 134 213 120" stroke="#f9efcf" stroke-width="22" fill="none" opacity=".95"/><g transform="translate(30 98)"><rect x="2" y="16" width="54" height="49" fill="#fffaf2" rx="6"/><path d="M-2 19 28 -4 59 19" fill="#f4ac8d" stroke="#d7866d" stroke-width="5" stroke-linejoin="round"/><rect x="24" y="36" width="15" height="29" rx="3" fill="#ba8a6e"/><rect x="7" y="29" width="13" height="13" rx="3" fill="#b5dbe2"/></g><g transform="translate(330 111)"><rect x="16" y="32" width="7" height="48" rx="3" fill="#97754f"/><circle cx="17" cy="24" r="29" fill="#72b994"/><circle cx="40" cy="33" r="22" fill="#81c8a5"/><circle cx="1" cy="38" r="19" fill="#9dd5b1"/></g><g stroke="#f0bf69" stroke-width="3" stroke-linecap="round"><path d="M115 154v9m8-10v11m190-5v9"/></g></svg><div class="scene-buddy" aria-hidden="true">${r.emoji||'📚'}</div><span class="scene-caption">${esc(r.name)}</span></div>`;}
+const adventureDefaults = {
+  scene: 'school',
+  locationNames: ['Lối đá', 'Mái hiên', 'Gốc cây', 'Bậc thềm', 'Đầu lối'],
+  gate: 'Đặt các mảnh chữ vào bảng gỗ để hoàn thành lời nhắn mở đường.',
+  unlock: 'Lời nhắn đã hoàn chỉnh. Con đường phía trước sáng lên.'
+};
+
+function adventureFor(mission) {
+  return {...adventureDefaults, ...D.adventures?.[mission.regionId], ...D.adventureMissions?.[mission.id]};
+}
+
+
+function scene(region,small=false) {
+  const selected = typeof region === 'string' ? R[region] : region || D.regions[0];
+  const setting = D.adventures?.[selected.id]?.scene || adventureDefaults.scene;
+  return `<div class="scene ${small?'small':''}" data-scene="${esc(setting)}">
+    <span class="scene-caption">${esc(selected.name)}</span>
+  </div>`;
+}
 function btn(action,text,style='primary',extra=''){return `<button type="button" class="btn ${style}" data-action="${esc(action)}" ${extra}>${text}</button>`;}
 function topbar(sub='HSK 1 · 300 từ'){return `<header class="topbar"><button class="brand" data-action="nav" data-view="home" aria-label="Về trang chủ"><span class="brand-mark">汉</span><span><strong>Hán Ngữ Phiêu Lưu</strong><small>${esc(sub)}</small></span></button><button class="round-button" data-action="nav" data-view="settings" aria-label="Cài đặt">${icon('settings')}</button></header>`;}
 function nav(active){return `<nav class="bottom-nav" aria-label="Điều hướng chính">${[['home','home','Trang chủ'],['map','map','Khám phá'],['review','repeat','Ôn tập'],['words','book','Từ điển'],['progress','chart','Tiến độ']].map(([name,ico,lab])=>`<button class="nav-item ${active===name?'active':''}" data-action="nav" data-view="${name}" aria-label="${lab}">${icon(ico)}<span>${lab}</span></button>`).join('')}</nav>`;}
@@ -40,17 +58,21 @@ function progressBar(a,b,label='Tiến độ'){return `<div class="meter" role="
 function nextMission(){return D.missions.find(m=>!state.completed.includes(m.id))||D.missions[D.missions.length-1];}
 function regionCompleted(r){return r.missionIds.filter(mid=>state.completed.includes(mid)).length;}
 function home(){const st=E.stats(state),m=nextMission(),r=R[m.regionId],isActive=!!state.active;
- return frame(`<section class="eyebrow">${icon('spark')} ĐI MỖI NGÀY MỘT CHÚT, NHỚ THẬT LÂU</section><div class="hero"><div class="hero-body"><span class="mini-label">🌱 HÀNH TRÌNH CỦA BẠN</span><h1>Học chữ Hán như một cuộc phiêu lưu.</h1><p class="subtle">Mỗi từ sẽ trở lại trong những tình huống khác nhau. Không cần đua điểm, chỉ cần nhớ lâu hơn.</p><div class="hero-stats"><b>${st.seen}<span>/300 từ đã gặp</span></b><b>${st.quests}<span>/${st.totalQuests} chặng</span></b></div>${progressBar(st.seen,300,'Từ vựng đã gặp')}</div>${scene(r)}</div>
- <div class="top-buttons">${btn(isActive?'resume':'begin-next',`${icon('play')} ${isActive?'Tiếp tục đang chơi':'Tiếp tục phiêu lưu'}`)}${btn('nav',`${icon('repeat')} Ôn từ`, 'button-soft','data-view="review"')}</div>
+ const oldMission=state.active?.mode==='mission'&&state.active.queue[0]?.type!=='trail';
+ const playAction=oldMission?'switch-to-trail':isActive?'resume':'begin-next';
+ const playLabel=oldMission?'Thử đường đèn mới':isActive?'Tiếp tục đang chơi':'Tiếp tục phiêu lưu';
+ return frame(`<div class="hero"><div class="hero-body"><h1>Theo dấu đèn lồng</h1><p class="subtle">Tìm chữ Hán quanh mình, thắp đèn bằng trí nhớ rồi ghép lời nhắn để mở đường.</p><div class="hero-stats"><b>${st.seen}<span>/300 từ đã gặp</span></b><b>${st.quests}<span>/${st.totalQuests} chặng</span></b></div>${progressBar(st.seen,300,'Từ vựng đã gặp')}</div>${scene(r)}</div>
+ <div class="top-buttons">${btn(playAction,`${icon('play')} ${playLabel}`)}${btn('nav',`${icon('repeat')} Ôn từ`, 'button-soft','data-view="review"')}</div>
+ ${oldMission?btn('resume','Tiếp tục lượt đang dở','button-text full mt8'):''}
  <div class="home-reminder"><div class="reminder-em">🧠</div><div><strong>${st.due?`${st.due} lượt luyện đang cần ôn`:'Bắt đầu ôn để tạo trí nhớ dài hạn'}</strong><p>Từ hay quên sẽ quay lại sớm hơn. Bạn không bị phạt khi nghỉ học.</p></div><button data-action="nav" data-view="review" aria-label="Mở ôn tập">${icon('arrow')}</button></div>
- <div class="section-title"><h2>Điểm dừng tiếp theo</h2><button class="link-button" data-action="nav" data-view="map">Xem bản đồ ${icon('arrow')}</button></div><button class="next-card" data-action="start-mission" data-id="${m.id}"><span class="next-emoji">${r.emoji}</span><span><small>Khu vực ${r.number} · Chặng ${m.step}</small><strong>${esc(r.name)}</strong><span class="mini-wordchain">${m.wordIds.map(id=>hanzi(W[id].hanzi)).join(' · ')}</span></span>${icon('arrow')}</button>
+ <div class="section-title"><h2>Điểm dừng tiếp theo</h2><button class="link-button" data-action="nav" data-view="map">Xem bản đồ ${icon('arrow')}</button></div><button class="next-card" data-action="start-mission" data-id="${m.id}"><span class="next-emoji">${r.emoji}</span><span><small>${esc(r.name)} · Chặng ${m.step}</small><strong>${esc(D.adventureMissions?.[m.id]?.title||'Theo dấu đèn lồng')}</strong><span class="mini-wordchain">${m.wordIds.map(id=>hanzi(W[id].hanzi)).join(' · ')}</span></span>${icon('arrow')}</button>
  <div class="section-title"><h2>Học theo cách của bạn</h2></div><div class="feature-grid"><button class="feature-card" data-action="nav" data-view="words"><span class="feature-icon">🔤</span><b>Chữ gốc → từ ghép</b><small>Tra đủ 300 từ, xem từ cùng họ.</small></button><button class="feature-card" data-action="nav" data-view="reader"><span class="feature-icon">📖</span><b>Đọc hiểu theo chủ đề</b><small>Đọc câu trong ngữ cảnh, hiện Pinyin khi cần.</small></button></div>
  `,'home');}
 function mapView(){const st=E.stats(state);if(!selectedRegion)selectedRegion=nextMission().regionId;
  let out=`<div class="eyebrow">${icon('map')} BẢN ĐỒ HỌC TẬP</div><h1>${D.regions.length} vùng đất tiếng Trung</h1><p class="subtle mt8">${st.totalQuests} chặng nhỏ · ${st.total} từ. Các từ cũ vẫn quay lại trong nhiệm vụ mới.</p><div class="map-overview">${progressBar(st.quests,st.totalQuests,'Số chặng đã hoàn thành')}<span>${st.quests}/${st.totalQuests} chặng hoàn thành</span></div><div class="region-list">`;
  D.regions.forEach((r,idx)=>{const count=regionCompleted(r),open=r.id===selectedRegion;const firstUnfinished=nextMission(),unlocked=idx===0||D.regions.slice(0,idx).every(q=>q.missionIds.every(mid=>state.completed.includes(mid)))||r.missionIds.some(mid=>state.completed.includes(mid))||r.id===firstUnfinished.regionId;
   out+=`<div class="region-card ${open?'expanded':''} ${!unlocked?'region-upcoming':''}"><button class="region-head" data-action="region" data-id="${r.id}" aria-expanded="${open}"><span class="region-emoji">${r.emoji}</span><span class="region-desc"><small>VÙNG ${idx+1} · ${r.wordIds.length} TỪ</small><strong>${esc(r.name)}</strong><em>${count}/${r.missionIds.length} chặng · ${unlocked?'Có thể chơi':'Sắp mở khóa'}</em></span><span class="region-chevron">⌄</span></button>`;
-  if(open){out+=scene(r,true)+`<p class="region-intro">${esc(r.intro)}</p><div class="quest-list">`;r.missionIds.forEach(mid=>{const m=M[mid],done=state.completed.includes(mid),mx=D.missions.findIndex(x=>x.id===mid);const allowed=mx===0||done||state.completed.includes(D.missions[mx-1].id);out+=`<button class="quest-row" data-action="start-mission" data-id="${mid}" ${allowed?'':'disabled'}><span class="quest-dot ${done?'done':allowed?'available':'locked'}">${done?icon('check'):allowed?'✦':'•'}</span><span><strong>${esc(m.title)}</strong><small>${m.wordIds.map(wid=>W[wid].hanzi).join(' · ')}</small></span>${allowed?icon('arrow'):''}</button>`;});out+=`</div>`;}
+  if(open){out+=scene(r,true)+`<p class="region-intro">${esc(D.adventures?.[r.id]?.objective||r.intro)}</p><div class="quest-list">`;r.missionIds.forEach(mid=>{const m=M[mid],done=state.completed.includes(mid),mx=D.missions.findIndex(x=>x.id===mid);const allowed=mx===0||done||state.completed.includes(D.missions[mx-1].id);out+=`<button class="quest-row" data-action="start-mission" data-id="${mid}" ${allowed?'':'disabled'}><span class="quest-dot ${done?'done':allowed?'available':'locked'}">${done?icon('check'):allowed?'✦':'•'}</span><span><strong>${esc(D.adventureMissions?.[mid]?.title||m.title)}</strong><small>${m.wordIds.map(wid=>W[wid].hanzi).join(' · ')}</small></span>${allowed?icon('arrow'):''}</button>`;});out+=`</div>`;}
   out+='</div>';});out+='</div>';return frame(out,'map');}
 function review(){
   const st=E.stats(state);
@@ -168,7 +190,189 @@ function settings(){
     </div>`,'settings');
 }
 function questIntro(active){const m=M[active.missionId],r=R[m.regionId];return `<div class="quest-screen"><button class="back-link" data-action="quit">${icon('left')} Bản đồ</button><div class="eyebrow">🌱 VÙNG ${r.number} · CHẶNG ${m.step}</div>${scene(r)}<div class="card mt14"><span class="mini-label">NHIỆM VỤ MỚI</span><h1 class="mt8">${esc(r.name)}</h1><p class="subtle mt10">${esc(r.intro)}</p><div class="word-pill-row">${m.wordIds.map(id=>`<span class="word-pill">${hanzi(W[id].hanzi)}</span>`).join('')}</div><p class="learning-note mt12">Bạn sẽ gặp từ mới, đọc chữ, ghép câu, rồi ôn lại trong những ngày sau. Có thể dừng giữa chặng và chơi tiếp bất cứ lúc nào.</p>${btn('begin-quest',`${icon('play')} Bắt đầu khám phá`,'primary full mt20')}</div></div>`;}
-function playHeader(){const x=state.active;const mission=x.mode==='mission'?M[x.missionId]:null;return `<div class="play-header"><button class="back-circle" data-action="quit" aria-label="Dừng và về trang trước">${icon('left')}</button><div><b>${mission?esc(R[mission.regionId].name):x.mode==='review'?'Buổi ôn ghi nhớ':x.mode==='word'?'Luyện một từ':'Luyện ghép câu'}</b><small>Thử thách ${x.index+1} / ${x.queue.length}</small>${progressBar(x.index,x.queue.length,'Thử thách')}</div><button class="back-circle" data-action="quit" aria-label="Đóng">${icon('close')}</button></div>`;}
+function playHeader() {
+  const active = state.active;
+  const mission = active.mode === 'mission' ? M[active.missionId] : null;
+  const task = current();
+  const isAdventure = task.type === 'trail' || task.gate;
+  const label = mission ? R[mission.regionId].name : active.mode === 'review'
+    ? 'Buổi ôn ghi nhớ' : active.mode === 'word' ? 'Luyện một từ' : 'Luyện ghép câu';
+  const stage = isAdventure ? `Chặng ${mission.step} · ${task.gate?'Lối ra':'Bản đồ đèn'}`
+    : `Thử thách ${active.index+1} / ${active.queue.length}`;
+  return `<div class="play-header">
+    <button class="back-circle" data-action="quit" aria-label="${mission?'Về bản đồ':'Dừng lượt ôn'}">${icon('left')}</button>
+    <div><b>${esc(label)}</b><small>${stage}</small>
+    ${isAdventure?'':progressBar(active.index,active.queue.length,'Thử thách')}</div>
+  </div>`;
+}
+const trailLayouts = {
+  3: [[20, 64], [51, 34], [81, 60]],
+  4: [[16, 68], [34, 36], [65, 46], [84, 73]],
+  5: [[16, 74], [21, 33], [49, 60], [74, 31], [84, 71]]
+};
+
+function focusAdventure(selector) {
+  const element = app.querySelector(selector);
+  if (!element) return;
+  if (element.tagName !== 'BUTTON') element.tabIndex = -1;
+  element.focus({preventScroll:true});
+}
+
+function adventureIntro(active) {
+  const mission = M[active.missionId];
+  const region = R[mission.regionId];
+  const story = adventureFor(mission);
+  return `<section class="quest-screen">
+    <button class="back-link" data-action="quit">${icon('left')} Bản đồ</button>
+    ${scene(region)}
+    <div class="card mt14">
+      <div class="mini-label">${esc(region.name)} · Chặng ${mission.step}</div>
+      <h1 class="mt8">${esc(story.title || 'Theo dấu đèn lồng')}</h1>
+      <p class="subtle mt10">${esc(story.objective || mission.intro)}</p>
+      <p class="body-note mt12">Ghé từng điểm sáng để gặp chữ mới. Khi màn đêm buông xuống, trí nhớ của bạn sẽ thắp sáng đường đi.</p>
+      ${btn('begin-quest','Bước vào chặng','primary full mt20')}
+    </div>
+  </section>`;
+}
+
+function trailBoard(task, progress, story, phase) {
+  const positions = trailLayouts[task.wordIds.length];
+  const path = positions.map(point => point.join(',')).join(' ');
+  const pending = task.order[progress.solved.length];
+  return `<div class="adventure-board" data-scene="${esc(story.scene)}" data-phase="${phase}" role="group" aria-label="Bản đồ đèn lồng">
+    <div class="adventure-board-art" aria-hidden="true">
+      <svg class="adventure-trail-line" viewBox="0 0 100 100" preserveAspectRatio="none" focusable="false">
+        <polyline points="${path}"></polyline>
+        ${positions.slice(1).map(([x,y],index) => {
+          const [startX,startY] = positions[index];
+          if (!progress.solved.includes(task.wordIds[index]) || !progress.solved.includes(task.wordIds[index+1])) return '';
+          return `<line class="is-lit" x1="${startX}" y1="${startY}" x2="${x}" y2="${y}"></line>`;
+        }).join('')}
+      </svg>
+    </div>
+    ${task.wordIds.map((id,index) => {
+      const [x,y] = positions[index];
+      const found = progress.visited.includes(id);
+      const lit = progress.solved.includes(id);
+      const current = progress.selected === id || (progress.hinted && pending === id);
+      const name = story.locationNames[index] || adventureDefaults.locationNames[index];
+      const classes = [found && 'is-found', lit && 'is-lit', current && 'is-current',
+        progress.missed === id && 'is-missed'].filter(Boolean).join(' ');
+      const visible = (phase === 'explore' && found) || lit;
+      const status = lit?'đã thắp sáng':phase==='explore'?(found?'đã khám phá':'chưa khám phá'):'đang tắt';
+      return `<button type="button" class="adventure-spot ${classes}" style="--spot-x:${x}%;--spot-y:${y}%"
+        data-action="trail-spot" data-id="${id}" aria-label="${esc(name)} · ${status}" ${lit?'disabled':''}>
+        <span class="adventure-spot-icon" aria-hidden="true">${visible?esc(W[id].emoji||'✦'):'✦'}</span>
+        <span class="adventure-spot-name">${esc(name)}</span>
+      </button>`;
+    }).join('')}
+  </div>`;
+}
+
+function wordMemory(word, locationName) {
+  return `<div class="adventure-memory" aria-label="Chữ ghi nhớ">
+    <div class="adventure-memory-title">
+      <span class="adventure-word-icon" aria-hidden="true">${esc(word.emoji || '✦')}</span>
+      <div class="adventure-glyph">${hanzi(word.hanzi)}</div>
+      <button class="speak" data-action="speak" data-text="${esc(word.hanzi)}" aria-label="Nghe phát âm">${icon('sound')}</button>
+    </div>
+    <div class="adventure-reading">${esc(word.pinyin)} · ${esc(word.vi)}</div>
+    <p><strong>${esc(locationName)}</strong>. ${esc(word.memo)}</p>
+  </div>`;
+}
+
+function trailTask(task) {
+  const story = adventureFor(M[task.missionId]);
+  const progress = E.trailState(task, state.active.trail);
+  const total = task.wordIds.length;
+  const count = progress.recall ? progress.solved.length : progress.visited.length;
+  const phase = progress.recall ? (count === total ? 'ready' : 'recall') : 'explore';
+  const pending = task.order[count];
+  const word = W[pending];
+  const lastLit = W[progress.solved.at(-1)];
+  const memoryLocation = task.wordIds.indexOf(progress.hinted ? pending : progress.selected);
+  const activeLocation = story.locationNames[memoryLocation] || adventureDefaults.locationNames[memoryLocation];
+  const clue = word && (count % 2 || task.wordIds.some(id => id !== pending && W[id].vi === word.vi)
+    ? hanzi(word.hanzi) : esc(word.vi));
+  const title = phase === 'explore' ? 'Tìm dấu chữ quanh bạn' : phase === 'recall' ? 'Thắp lại đèn trong trí nhớ' : 'Đường đi đã sáng';
+  const locations = phase === 'explore' ? 'điểm đã ghé' : 'đèn đã thắp';
+  const feedback = progress.missed ? 'Đèn khẽ rung. Hãy thử nhớ lại nơi bạn đã gặp dấu chữ này.'
+    : phase === 'ready' ? 'Ánh đèn dẫn tới lối ra.'
+    : lastLit ? `Đèn ${hanzi(lastLit.hanzi)} đã sáng · ${esc(lastLit.pinyin)} · ${esc(lastLit.vi)}` : '';
+  let memory = '';
+  if (phase === 'explore' && progress.selected) memory = wordMemory(W[progress.selected], activeLocation);
+  if (phase === 'recall' && progress.hinted) memory = wordMemory(word, activeLocation);
+  return `<section class="adventure-panel">
+    <header class="adventure-heading">
+      <h2>${title}</h2>
+      <p class="adventure-progress">${count}/${total} ${locations}</p>
+    </header>
+    ${phase === 'recall' ? `<div class="adventure-memory adventure-clue" id="adventure-clue">
+      <p>Thắp đèn nơi bạn gặp từ này</p><strong>${clue}</strong>
+    </div>` : ''}
+    ${trailBoard(task, progress, story, phase)}
+    <p class="adventure-message" role="status">${feedback || (phase==='explore'
+      ? 'Chạm vào một điểm sáng và gắn chữ với nơi bạn thấy nó.'
+      : 'Hãy thử đọc thầm rồi chạm vào đúng điểm.')}</p>
+    ${memory}
+    <div class="adventure-actions">
+      ${phase==='explore' && count===total ? btn('trail-recall','Tắt đèn và thử nhớ','primary full')
+        : phase==='recall' && !progress.hinted ? btn('trail-hint','Gợi ý vị trí','button-soft full')
+        : phase==='ready' ? btn('trail-gate','Đi tới lối ra','primary full') : ''}
+    </div>
+  </section>`;
+}
+
+function adventureGate(task) {
+  const active = state.active;
+  const mission = M[active.missionId];
+  const story = adventureFor(mission);
+  const sentence = S[task.sentenceId];
+  const feedback = active.feedback;
+  const opened = feedback?.quality === 'good';
+  if (opened || feedback) {
+    const reply = task.sentenceId === 'bs09' ? S.bs10 : null;
+    return `<section class="adventure-gate ${opened?'is-open':'is-missed'}">
+      <div class="adventure-gate-icon" aria-hidden="true">${opened?'✦':'◆'}</div>
+      <h2>${opened?'Lối đi đã mở':'Bảng chữ chưa sáng'}</h2>
+      <p>${esc(opened ? story.unlock : 'Xem cách đặt các mảnh chữ rồi thử lại.')}</p>
+      <div class="adventure-gate-answer">
+        <strong>${hanzi(sentence.hanzi)}</strong><span>${esc(sentence.pinyin)}</span>
+      </div>
+      ${opened && reply ? `<div class="adventure-gate-answer">
+        <small>Tiểu Ngữ đáp lời</small><strong>${hanzi(reply.hanzi)}</strong>
+        <span>${esc(reply.pinyin)} · ${esc(reply.vi)}</span>
+      </div>` : ''}
+      ${btn('next-task',opened?'Hoàn thành chặng':'Xếp lại lời nhắn','primary full')}
+    </section>`;
+  }
+  const chosen = active.chosen;
+  const tiles = task.tiles;
+  return `<section class="adventure-gate">
+    <div class="adventure-gate-icon" aria-hidden="true">◆</div>
+    <h2>Lời nhắn mở lối</h2>
+    <p>${esc(story.gate)}</p>
+    <div class="translation-box">${esc(sentence.vi)}</div>
+    ${glossary(task,[sentence])}
+    ${active.hint ? `<p class="hint-show" id="gate-hint">Mẫu lời nhắn: ${hanzi(sentence.hanzi)} · ${esc(sentence.pinyin)}</p>` : ''}
+    <div class="answer-area gate-slots" aria-label="Các ô đặt mảnh chữ">
+      ${tiles.map((_tile,index) => {
+        const tile = tiles[chosen[index]];
+        return tile ? `<button type="button" class="tile chosen" data-action="remove-tile" data-index="${index}" aria-label="Tháo mảnh ${esc(tile.text)}">${hanzi(tile.text)}</button>`
+          : '<span class="gate-slot" aria-hidden="true">·</span>';
+      }).join('')}
+    </div>
+    <div class="tiles" aria-label="Túi mảnh chữ">
+      ${tiles.map((tile,index) => `<button type="button" class="tile" data-action="choose-tile" data-index="${index}" ${chosen.includes(index)?'disabled':''}>${hanzi(tile.text)}</button>`).join('')}
+    </div>
+    <div class="button-row">
+      ${btn('clear-tiles','Xếp lại','button-soft',chosen.length?'':'disabled')}
+      ${btn('submit-build','Gửi lời nhắn','primary',chosen.length===tiles.length?'':'disabled')}
+    </div>
+    ${active.hint?'':btn('gate-hint','Xem mẫu lời nhắn','button-text full')}
+  </section>`;
+}
+
 function generatePronunciationNote(word){
   if(word.hanzi==='不')return '<p class="body-note mt8">不 viết là bù khi đứng riêng. Trước âm tiết thanh 4, đọc bú, như 不是 (bú shì).</p>';
   if(word.hanzi==='一')return '<p class="body-note mt8">一 đọc yī khi đếm riêng. Trước thanh 4 thường đọc yí, còn trước thanh 1, 2, 3 thường đọc yì.</p>';
@@ -256,23 +460,26 @@ function dialogueTask(task){
     ${glossary(task,[])}${answerOptions(task,'answer-dialogue',{chinese:true})}</div>`;
 }
 function feedbackTask(feedback){return `<div class="feedback-screen ${feedback.quality==='good'?'good':'retry'}"><span class="feedback-emoji">${feedback.quality==='good'?'🌿':feedback.quality==='almost'?'💡':'💛'}</span><h2>${esc(feedback.heading)}</h2><p>${esc(feedback.intro)}</p><div class="feedback-answer"><strong>${hanzi(feedback.answerHanzi||'')}</strong>${feedback.pinyin?`<em>${esc(feedback.pinyin)}</em>`:''}${feedback.vi?`<span>${esc(feedback.vi)}</span>`:''}</div>${feedback.explanation?`<p class="explanation">${esc(feedback.explanation)}</p>`:''}<div class="button-row mt18">${feedback.answerHanzi?btn('speak',`${icon('sound')} Nghe lại`,'button-white','data-text="'+esc(feedback.answerHanzi)+'"'):''}${btn('next-task',`${icon('arrow')} Tiếp tục`,'primary')}</div></div>`;}
-function finished(){const f=lastFinish||{title:'Hoàn thành buổi học',description:'Những từ khó sẽ xuất hiện lại vào lúc cần ôn.'};const st=E.stats(state);return frame(`<div class="finish"><div class="finish-icon">🌳</div><span class="mini-label">MỖI LẦN CHƠI LÀ MỘT LẦN NHỚ</span><h1>${esc(f.title)}</h1><p class="subtle mt10">${esc(f.description||'Bạn đã luyện lại chữ Hán, Pinyin và cách dùng. Các từ chưa chắc sẽ tiếp tục quay lại.')}</p><div class="finish-stat"><div><strong>${st.seen}/300</strong><small>Từ đã gặp</small></div><div><strong>${st.due}</strong><small>Lượt cần ôn</small></div></div>${btn('begin-next',`${icon('play')} Khám phá tiếp`,'primary full mt20')}${btn('nav',`${icon('repeat')} Ôn những từ đã gặp`,'button-soft full mt12','data-view="review"')}${btn('nav','Về trang chủ','button-text full mt8','data-view="home"')}</div>`,'home');}
+function finished(){const f=lastFinish||{title:'Hoàn thành buổi học',description:'Những từ khó sẽ xuất hiện lại vào lúc cần ôn.'};const st=E.stats(state);return frame(`<div class="finish"><div class="finish-icon" aria-hidden="true">${f.symbol||'🌿'}</div><h1>${esc(f.title)}</h1><p class="subtle mt10">${esc(f.description||'Bạn đã luyện lại chữ Hán, Pinyin và cách dùng. Các từ chưa chắc sẽ tiếp tục quay lại.')}</p><div class="finish-stat"><div><strong>${st.seen}/300</strong><small>Từ đã gặp</small></div><div><strong>${st.due}</strong><small>Lượt cần ôn</small></div></div>${btn('begin-next',`${icon('play')} Khám phá tiếp`,'primary full mt20')}${btn('nav',`${icon('repeat')} Ôn những từ đã gặp`,'button-soft full mt12','data-view="review"')}${btn('nav','Về trang chủ','button-text full mt8','data-view="home"')}</div>`,'home');}
 let lastFinish=null;
 const taskViews={learn:learnTask,meaning:meaningTask,reading:readingTask,hanzi:hanziTask,tone:toneTask,
-  cloze:clozeTask,build:buildTask,story:storyTask,passage:passageTask,dialogue:dialogueTask};
+  cloze:clozeTask,build:buildTask,story:storyTask,passage:passageTask,dialogue:dialogueTask,trail:trailTask};
 function renderPlay(){
   const active=state.active,task=current();
   if(!active||!task){view='home';return home();}
+  if(active.intro&&active.mode==='mission'&&task.type==='trail') {
+    return `<main class="app-main play-main">${adventureIntro(active)}</main>`;
+  }
   const content=active.intro&&active.mode==='mission'
     ? questIntro(active)
-    : playHeader()+(active.feedback?feedbackTask(active.feedback):taskViews[task.type](task));
+    : playHeader()+(task.gate?adventureGate(task):active.feedback?feedbackTask(active.feedback):taskViews[task.type](task));
   return `<main class="app-main play-main">${content}</main>`;
 }
 function render(){document.body.classList.toggle('reduce-motion',state.preferences.lowMotion);try{let html;switch(view){case'home':html=home();break;case'map':html=mapView();break;case'review':html=review();break;case'words':html=words();break;case'detail':html=detail();break;case'progress':html=progress();break;case'reader':html=reader();break;case'settings':html=settings();break;case'play':html=renderPlay();break;case'finished':html=finished();break;default:view='home';html=home();}app.innerHTML=html;if(!E.storageHealthy())toast('Trình duyệt không lưu được tiến độ. Hãy dùng tính năng sao lưu.');}catch(err){console.error('Render error',err);app.innerHTML=`<div class="app-main error-screen"><h2>Gặp lỗi hiển thị</h2><p>Hãy tải lại trang. Dữ liệu đã lưu vẫn được giữ trên thiết bị.</p><button class="btn primary" data-action="reload">Tải lại</button></div>`;}}
 function goto(next){view=next;render();scrollUp();if(view==='play')focusPlayHeading();}
 function startMission(id){const m=M[id];if(!m)return;const idx=D.missions.findIndex(q=>q.id===id);if(idx>0&&!state.completed.includes(id)&&!state.completed.includes(D.missions[idx-1].id)){toast('Hãy hoàn thành chặng trước để mở lối nhé.');return;}
  if(!confirmSessionChange('mission',id))return;
- startSession('mission',E.missionQueue(state,m),id);}
+ startSession('mission',E.adventureQueue(state,m),id);}
 function activeDefaults(mode,queue,missionId){return {mode,missionId,queue,index:0,intro:mode==='mission',chosen:[],hint:false,feedback:null,repeats:{},readingInput:''};}
 function startSession(mode,queue,missionId=null){state.active=activeDefaults(mode,queue,missionId);E.save(state);goto('play');}
 function confirmSessionChange(mode,missionId=null){
@@ -295,13 +502,67 @@ function practiceWord(id){
 }
 function current(){return state.active?.queue[state.active.index];}
 function maybeAudio(){const t=current();if(state.preferences.audio&&t?.type==='learn')speak(W[t.wordId].hanzi,false);}
+function visitSpot(id) {
+  const active = state.active;
+  const task = current();
+  if (task?.type !== 'trail' || !task.wordIds.includes(id)) return;
+  const result = E.visitTrail(task, active.trail, id);
+  active.trail = result.progress;
+  if (result.found) E.see(state,id,false);
+  E.save(state);
+  render();
+  if (result.correct) {
+    focusAdventure(result.progress.solved.length === task.wordIds.length
+      ? '[data-action="trail-gate"]' : '#adventure-clue');
+  } else {
+    focusAdventure(`[data-action="trail-spot"][data-id="${id}"]`);
+  }
+  if (result.found && state.preferences.audio) speak(W[id].hanzi,false);
+}
+function beginTrailRecall() {
+  const active = state.active;
+  const task = current();
+  if (task?.type !== 'trail') return;
+  const progress = E.trailState(task, active.trail);
+  if (progress.recall || progress.visited.length !== task.wordIds.length) return;
+  active.trail = {...progress, recall:true, selected:null};
+  E.save(state);
+  render();
+  scrollUp();
+  focusAdventure('#adventure-clue');
+}
+function showTrailHint() {
+  const active = state.active, task = current();
+  if (task?.type !== 'trail') return;
+  const progress = E.trailState(task,active.trail);
+  if (!progress.recall || progress.solved.length === task.wordIds.length) return;
+  active.trail = {...progress,hinted:true,missed:null};
+  E.save(state);
+  render();
+  focusAdventure(`[data-action="trail-spot"][data-id="${task.order[progress.solved.length]}"]`);
+}
+function openTrailGate() {
+  const task = current();
+  if (task?.type === 'trail' && E.trailState(task,state.active.trail).solved.length === task.wordIds.length) nextTask();
+}
 function nextTask(){
   const active=state.active;
   if(!active)return;
+  if(current()?.gate&&active.feedback?.quality!=='good'){
+    if(!active.feedback)return;
+    active.feedback=null;
+    active.chosen=[];
+    active.hint=true;
+    E.save(state);
+    render();
+    focusAdventure('#gate-hint');
+    return;
+  }
   active.feedback=null;
   active.chosen=[];
   active.hint=false;
   active.readingInput='';
+  delete active.trail;
   active.index++;
   if(active.index>=active.queue.length){finish();return;}
   E.save(state);
@@ -310,7 +571,22 @@ function nextTask(){
   focusPlayHeading();
   maybeAudio();
 }
-function finish(){const a=state.active;if(!a)return;const isMission=a.mode==='mission';if(isMission&&!state.completed.includes(a.missionId)){state.completed.push(a.missionId);}state.stats.sessions++;lastFinish={title:isMission?'Bạn đã qua một chặng!':'Buổi luyện tập hoàn thành!',description:'Những chữ chưa chắc sẽ trở lại trong các lần chơi sau. Không cần học lại từ đầu.'};state.active=null;E.save(state);goto('finished');}
+function finish() {
+  const active = state.active;
+  if (!active) return;
+  const mission = active.mode === 'mission' ? M[active.missionId] : null;
+  if (mission && !state.completed.includes(mission.id)) state.completed.push(mission.id);
+  state.stats.sessions++;
+  lastFinish = {
+    title: mission ? 'Bạn đã mở thêm một lối đi' : 'Buổi luyện tập hoàn thành',
+    description: mission ? 'Những dấu chữ đã gặp được giữ lại trong sổ từ và lịch ôn.' :
+      'Những từ khó sẽ trở lại trong các lần ôn tiếp theo.',
+    symbol: mission ? '🏮' : '🌿'
+  };
+  state.active = null;
+  E.save(state);
+  goto('finished');
+}
 function giveFeedback(quality,word,explanation='',skill=null){
   const active=state.active,task=current();
   if(!active||!task||active.feedback)return;
@@ -320,7 +596,7 @@ function giveFeedback(quality,word,explanation='',skill=null){
     const exercise=task.type==='hanzi'?task.cue:`${task.type}:${task.sentenceId||task.wordId}`;
     E.grade(state,target,skill,quality,Date.now(),{hint:active.hint,exercise,persist:false});
     const key=`${skill}:${target}`;
-    if(!success&&!active.repeats[key]&&active.queue.length<120){
+    if(!success&&!task.gate&&!active.repeats[key]&&active.queue.length<120){
       const retry=E.taskFor(state,target,skill,task);
       if(retry){
         active.repeats[key]=1;
@@ -332,6 +608,7 @@ function giveFeedback(quality,word,explanation='',skill=null){
   active.feedback={quality,heading:success?'Chính xác':quality==='almost'?'Hãy nhớ lại cả cách đọc và thanh điệu':'Bạn sẽ gặp lại từ này',
     intro:success?'':'Xem đáp án rồi thử lại trong buổi này hoặc lần ôn tiếp theo.',
     answerHanzi:sentence?.hanzi||word?.hanzi||'',pinyin:sentence?.pinyin||word?.pinyin||'',vi:sentence?.vi||word?.vi||'',explanation};
+  if(success&&task.gate&&!state.completed.includes(active.missionId))state.completed.push(active.missionId);
   E.save(state);
   render();
   scrollUp();
@@ -439,9 +716,28 @@ app.addEventListener('click',e=>{
  if(act==='region'){selectedRegion=id;render();return;}
  if(act==='start-mission'){startMission(id);return;}
  if(act==='begin-next'){const next=nextMission();startMission(next.id);return;}
+ if(act==='switch-to-trail'){
+   const mission=state.active?.mode==='mission'&&M[state.active.missionId];
+   if(mission&&state.active.queue[0]?.type!=='trail'&&
+      confirm('Chơi lại chặng đang dở theo đường đèn mới? Các từ đã học và chặng đã hoàn thành vẫn được lưu.')){
+     startSession('mission',E.adventureQueue(state,mission),mission.id);
+   }
+   return;
+ }
  if(act==='resume'){goto('play');return;}
  if(act==='quit'){state.active&&E.save(state);if(state.active?.mode==='mission'){selectedRegion=M[state.active.missionId].regionId;goto('map');}else goto('home');return;}
  if(act==='begin-quest'){state.active.intro=false;E.save(state);render();scrollUp();focusPlayHeading();maybeAudio();return;}
+ if(act==='trail-spot'){visitSpot(id);return;}
+ if(act==='trail-recall'){beginTrailRecall();return;}
+ if(act==='trail-hint'){showTrailHint();return;}
+ if(act==='trail-gate'){openTrailGate();return;}
+ if(act==='gate-hint'&&current()?.gate&&!state.active.feedback){
+   state.active.hint=true;
+   E.save(state);
+   render();
+   focusAdventure('#gate-hint');
+   return;
+ }
  if(act==='next-learn'){const t=current();E.see(state,t.wordId,false);nextTask();return;}
  if(act==='next-story'||act==='next-task'){nextTask();return;}
  if(act==='answer-meaning'){answerMeaning(b.dataset.value);return;}

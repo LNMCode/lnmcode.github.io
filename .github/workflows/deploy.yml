@@ -30,7 +30,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/pages/learning"
           cp -R index.html privacy-policy.html app-ads.txt assets pictures .nojekyll "$RUNNER_TEMP/pages/"
           cp -R learning/hsk1 "$RUNNER_TEMP/pages/learning/"
-          sed "s/local-v4/${GITHUB_SHA}/" learning/hsk1/sw.js > "$RUNNER_TEMP/pages/learning/hsk1/sw.js"
+          sed "s/^const VERSION = .*/const VERSION = '${GITHUB_SHA}';/" learning/hsk1/sw.js > "$RUNNER_TEMP/pages/learning/hsk1/sw.js"
       - uses: actions/upload-pages-artifact@v4
         with:
           path: ${{ runner.temp }}/pages

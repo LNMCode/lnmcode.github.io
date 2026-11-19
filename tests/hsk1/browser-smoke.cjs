@@ -53,7 +53,39 @@ async function answerTask(page, context, correct) {
     default:
       throw Error(`Chưa hỗ trợ kiểm thử ${task.type}`);
   }
-  await page.locator(`.feedback-screen.${correct ? 'good' : 'retry'}`).waitFor();
+  const feedback = task.gate
+    ? `.adventure-gate.${correct ? 'is-open' : 'is-missed'}`
+    : `.feedback-screen.${correct ? 'good' : 'retry'}`;
+  await page.locator(feedback).waitFor();
+}
+
+async function checkBoard(page, scene) {
+  const board = page.locator(`.adventure-board[data-scene="${scene}"]`);
+  await board.waitFor();
+  assert.match(await board.evaluate((element) => getComputedStyle(element).backgroundImage), new RegExp(`${scene}\\.webp`));
+  assert.ok(await board.evaluate((element) => {
+    const map = element.getBoundingClientRect();
+    const spots = [...element.querySelectorAll('.adventure-spot')];
+    return document.documentElement.scrollWidth <= window.innerWidth &&
+      spots.every((spot) => {
+        const rect = spot.getBoundingClientRect();
+        return rect.width >= 44 && rect.height >= 44 && rect.left >= map.left && rect.right <= map.right;
+      });
+  }));
+}
+
+async function explore(page, wordIds) {
+  const spot = (id) => action(page, 'trail-spot', `[data-id="${id}"]`);
+  for (const id of wordIds) await spot(id).locator('.adventure-spot-name').click();
+  await action(page, 'trail-recall').click();
+  assert.equal(await page.locator('.adventure-board[data-phase="recall"] .adventure-spot-icon')
+    .evaluateAll((icons) => icons.every((icon) => icon.textContent === '✦')), true);
+}
+
+async function relight(page, order) {
+  for (const id of order) await action(page, 'trail-spot', `[data-id="${id}"]`).click();
+  await page.locator('.adventure-board[data-phase="ready"]').waitFor();
+  await action(page, 'trail-gate').click();
 }
 
 async function run() {
@@ -64,6 +96,7 @@ async function run() {
   try {
     context = await browser.newContext({ ...devices['iPhone 13'], defaultBrowserType: undefined, acceptDownloads: true });
     let page = await context.newPage();
+    context.setDefaultTimeout(8000);
     const errors = [];
     const failed = [];
     const observe = (tab) => {
@@ -81,59 +114,51 @@ async function run() {
     assert.ok(new URL(page.url()).pathname.endsWith('/learning/hsk1/'));
     await page.locator('.hero h1').waitFor();
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+    assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme), 'dark');
     await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller));
 
     await action(page, 'nav', '[data-view="map"]').first().click();
     await action(page, 'start-mission', '[data-id="m001"]').click();
     await action(page, 'begin-quest').click();
-    assert.equal(await page.locator('.visual-hanzi').textContent(), '你好');
-    await action(page, 'next-learn').click();
-    const firstQuestion = await snapshot(page);
-    assert.equal(firstQuestion.state.entries[firstQuestion.task.wordId].seenCount, 1);
-    await answerTask(page, firstQuestion, false);
-    const afterWrong = await snapshot(page);
-    assert.ok(afterWrong.state.active.queue.length > firstQuestion.state.active.queue.length);
-    assert.ok(afterWrong.state.entries[firstQuestion.task.wordId].meaning.mistakes >= 1);
+    await checkBoard(page, 'school');
+    const { task: firstTrail } = await snapshot(page);
+    assert.equal(firstTrail.type, 'trail');
+    await explore(page, firstTrail.wordIds);
+    const wrongId = firstTrail.wordIds.find((id) => id !== firstTrail.order[0]);
+    await action(page, 'trail-spot', `[data-id="${wrongId}"]`).click();
+    assert.equal(await page.locator('.adventure-spot.is-lit').count(), 0);
+    await action(page, 'trail-hint').click();
+    assert.equal(await page.locator('.adventure-spot.is-current').getAttribute('data-id'), firstTrail.order[0]);
+    const beforeClose = (await snapshot(page)).state.active;
 
     await page.close();
     page = await context.newPage();
     observe(page);
     await page.goto(url.href);
-    if (await action(page, 'resume').count()) await action(page, 'resume').click();
-    const reopened = await snapshot(page);
-    assert.equal(reopened.state.active.index, afterWrong.state.active.index);
-    if (await action(page, 'next-task').count()) {
-      await action(page, 'next-task').click();
-    } else {
-      await answerTask(page, reopened, true);
-      await action(page, 'next-task').click();
-    }
+    await action(page, 'resume').click();
+    assert.equal(await page.locator('.adventure-spot.is-current').getAttribute('data-id'), beforeClose.queue[0].order[0]);
+    await relight(page, firstTrail.order);
+    const firstGate = await snapshot(page);
+    assert.equal(firstGate.task.sentenceId, 'bs02');
+    await answerTask(page, firstGate, false);
+    assert.equal((await snapshot(page)).state.completed.length, 0);
+    await action(page, 'next-task').click();
+    await page.locator('#gate-hint').waitFor();
+    await answerTask(page, await snapshot(page), true);
+    await action(page, 'next-task').click();
 
-    const visited = new Set();
-    let reachedSecondChapter = false;
-    for (let step = 0; step < 180; step += 1) {
-      const current = await snapshot(page);
-      if (!current.task) {
-        if (current.state.completed.includes('m006')) {
-          reachedSecondChapter = true;
-          break;
-        }
-        await action(page, 'begin-next').first().click();
-        await action(page, 'begin-quest').click();
-        continue;
-      }
-      visited.add(current.task.type);
-      if (current.task.type === 'learn') await action(page, 'next-learn').click();
-      else if (current.task.type === 'story') await action(page, 'next-story').click();
-      else {
-        await answerTask(page, current, true);
-        await action(page, 'next-task').click();
-      }
+    for (let stage = 2; stage <= 6; stage += 1) {
+      await action(page, 'begin-next').first().click();
+      await action(page, 'begin-quest').click();
+      await checkBoard(page, stage <= 4 ? 'school' : 'market');
+      const { task } = await snapshot(page);
+      await explore(page, task.wordIds);
+      await relight(page, task.order);
+      await answerTask(page, await snapshot(page), true);
+      if (stage === 6) await page.getByText('我叫小语。', { exact: true }).waitFor();
+      await action(page, 'next-task').click();
     }
-    for (const type of ['reading', 'hanzi', 'tone', 'build', 'cloze', 'passage', 'dialogue']) {
-      assert.ok(visited.has(type), type);
-    }
-    assert.ok(reachedSecondChapter, 'Chưa hoàn thành nhiệm vụ hỏi tên ở chương hai');
+    assert.equal((await snapshot(page)).state.completed.length, 6);
 
     await action(page, 'nav', '[data-view="review"]').first().click();
     await action(page, 'review-skill', '[data-id="reading"]').click();
@@ -174,6 +199,9 @@ async function run() {
     await context.setOffline(true);
     await page.reload();
     await page.locator('.hero h1').waitFor();
+    for (const scene of ['school', 'market', 'river']) {
+      assert.ok(await page.evaluate(async (name) => (await fetch(`./art/${name}.webp`)).ok, scene));
+    }
     await action(page, 'nav', '[data-view="words"]').first().click();
     await page.locator('#word-search').fill('名字');
     await page.locator('.word-row').filter({ hasText: '名字' }).waitFor();

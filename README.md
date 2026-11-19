@@ -1,6 +1,6 @@
 ## Hán Ngữ Phiêu Lưu · HSK 1
 
-Game học tiếng Trung bằng tiếng Việt với 300 mục từ HSK 1, các chặng phiêu lưu, luyện Pinyin, ghép câu, đọc hiểu và ôn tập ngắt quãng.
+Game học tiếng Trung bằng tiếng Việt với 300 mục từ HSK 1. Mỗi chặng đưa bạn đến một cảnh đêm để gặp từ mới, tìm lại địa điểm của từ từ trí nhớ và dùng một từ hoặc một câu để mở lối. Lịch ôn ngắt quãng giúp bạn gặp lại các từ đã học.
 
 - [Mở trò chơi trên GitHub Pages](https://lnmcode.github.io/learning/hsk1/) sau khi workflow `Deploy GitHub Pages` chạy thành công.
 - Trên iPhone, mở link trong Safari. Để thêm biểu tượng vào màn hình chính, chọn **Chia sẻ → Thêm vào MH chính**. Mở game một lần khi có mạng và kiểm tra trạng thái ngoại tuyến trong **Cài đặt** trước khi ngắt mạng.

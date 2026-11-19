@@ -1,5 +1,24 @@
 # Khảo sát Hán Ngữ Phiêu Lưu
 
+## Cập nhật hành trình đèn lồng
+
+Mỗi chặng lưu vị trí của các từ trên bản đồ. Sau khi đã ghé đủ chỗ, người chơi tìm lại các vị trí theo gợi ý chữ Hán hoặc nghĩa tiếng Việt. Lời nhắn ghép ở cuối chặng mở lối đi và tiếp tục câu chuyện. Hai vùng mở đầu có lời dẫn riêng cho từng chặng.
+
+Kiểm thử tự động đi qua cả 72 chặng và thu đủ 300 từ. Kiểm thử Chromium ở kích thước iPhone 13 hoàn thành sáu chặng đầu, gồm chọn nhầm đèn, xem gợi ý, tiếp tục sau khi đóng trang, thử lại câu mở lối, ôn Pinyin, sao lưu và học ngoại tuyến. Một lần nâng cấp mô phỏng từ bản `e216a92` cũng giữ được chặng cũ đang chơi và tải được cả ba cảnh khi ngắt mạng.
+
+Ba cảnh nền WebP do ImageGen tạo và được lưu cùng game để dùng ngoại tuyến. [Sân trường](learning/hsk1/art/school.webp) · [Phố đèn](learning/hsk1/art/market.webp) · [Bờ sông](learning/hsk1/art/river.webp)
+
+<details>
+<summary>Prompt tạo cảnh nền</summary>
+
+Original background art for a Vietnamese mobile language-learning adventure, stylized-concept game environment illustration, wide landscape 3:2. Hand-painted 2D painterly game art with confident simplified silhouettes, velvet midnight sky, deep navy and pine green, warm amber paper lanterns, muted teal haze. Beautiful but legible at small sizes. Frame a few distinctive environmental landmarks around a broad dim clear walking surface through the middle and lower half, where several HTML game hotspots will be overlaid. Tangible location with foreground, midground, and background depth. Three-quarter slightly elevated view, quietly magical and inviting. Entire frame is the environment, no characters, typography, text, lettering, symbols, logo, borders, interface, or watermark.
+
+- A Chinese school and courtyard after dusk. An open timber school gate with two little lanterns on the left, softly lit classroom windows beyond, stone benches, a large ginkgo and a covered walkway to the right. A few leaves catch blue moonlight.
+- A compact lantern market in a Chinese old town at night. A small rounded amber awning behind a tea stand to the left, old wooden storefronts around the back, red-orange paper lanterns overhead, baskets and an empty cobblestone lane. Pools of warm light amid rich midnight shade.
+- A riverside Chinese village under a night sky. Calm ink-blue canal to the back, a low arched wooden bridge, a distant softly glowing pavilion, willows on the left, a stone walking trail and a small pier. Lanterns and crescent moon reflect on the water.
+
+</details>
+
 ## Hiện trạng bản ZIP
 
 ZIP có 9 tệp, giải nén và kiểm tra toàn vẹn thành công. `index.html` nạp dữ liệu, engine và giao diện JavaScript thuần. Hai ảnh PNG có kích thước 192 × 192 và 512 × 512. Game đã có bản đồ, thẻ học, sổ từ, bài Pinyin, ghép câu, điền từ, đoạn đọc, lịch ôn theo từng kỹ năng, lưu bằng localStorage, xuất và nhập JSON.

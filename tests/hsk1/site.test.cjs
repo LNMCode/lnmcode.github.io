@@ -9,6 +9,7 @@ const pages = [
   'https://lnmcode.github.io/learning/hsk1/',
   'https://example.github.io/project/learning/hsk1/',
 ];
+const artworks = ['./art/school.webp', './art/market.webp', './art/river.webp'];
 
 function localResource(base, reference) {
   const url = new URL(reference, base);
@@ -67,7 +68,7 @@ test('service worker cache theo đường dẫn, giữ cache khác và mở bài
   assert.equal(stores.has(oldCache), false);
   assert.equal(stores.has(otherGame), true);
   assert.equal(stores.has(otherSite), true);
-  for (const reference of ['./', './?from=offline', './index.html', './data.js', './engine.js', './app.js', './styles.css']) {
+  for (const reference of ['./', './?from=offline', './index.html', './data.js', './engine.js', './app.js', './styles.css', ...artworks]) {
     const url = new URL(reference, scope);
     const mode = url.pathname.endsWith('/') ? 'navigate' : 'same-origin';
     const response = await dispatch('fetch', { request: { method: 'GET', url: url.href, mode } });
@@ -92,6 +93,14 @@ for (const page of pages) {
     const manifest = JSON.parse(readFileSync(path.join(appRoot, path.basename(manifestUrl.pathname)), 'utf8'));
     assert.equal(new URL(manifest.scope, manifestUrl).href, base.href);
     assert.equal(manifest.display, 'standalone');
+    assert.ok(html.includes('<meta name="color-scheme" content="dark">'));
+    assert.ok(html.includes(`<meta name="theme-color" content="${manifest.theme_color}">`));
+    assert.equal(manifest.background_color, manifest.theme_color);
+    const styles = readFileSync(path.join(appRoot, 'styles.css'), 'utf8');
+    for (const artwork of artworks) {
+      localResource(base, artwork);
+      assert.ok(styles.includes(`url("${artwork}")`), artwork);
+    }
     localResource(base, manifest.start_url);
     for (const size of [192, 512]) {
       const icon = manifest.icons.find((item) => item.sizes.split(/\s+/).includes(`${size}x${size}`));

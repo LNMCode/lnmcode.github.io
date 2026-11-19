@@ -9,6 +9,119 @@ window.HSK_GAME_DATA = {
     "mnemonicWarning": "Mẹo nhớ dùng để liên tưởng. Mục mặt chữ mô tả các phần nhìn thấy hoặc các chữ ghép thành từ.",
     "syllabusUrl": "https://hsk.cn-bj.ufileos.com/3.0/%E6%96%B0%E7%89%88HSK%E8%80%83%E8%AF%95%E5%A4%A7%E7%BA%B21219.pdf#page=80"
   },
+  "adventures": {
+    "r01": {
+      "scene":"school", "locationNames":["Cổng trường","Cửa lớp","Cây bạch quả","Ghế đá","Hành lang"],
+      "objective":"Đêm đầu tiên ở trường, cả lớp để lại đèn dẫn đường chờ bạn tới.",
+      "gate":"Dùng lời vừa học để cả lớp biết bạn đã tới.", "unlock":"Đèn trên hiên lớp bật sáng. Các bạn nhích sang nhường chỗ cho bạn."
+    },
+    "r02": {
+      "scene":"market", "locationNames":["Quầy trà","Mái hiên","Bậc cửa","Sạp đèn","Cây treo đèn"],
+      "objective":"Một người bạn để lại dấu đèn trong phố. Lần theo ánh sáng để gặp bạn ấy.",
+      "gate":"Ghép lời đáp cho người bạn đang chờ ở đầu ngõ.", "unlock":"Người bạn cầm đèn đi trước, dẫn bạn sang phố bên."
+    },
+    "r03": {
+      "scene":"river", "locationNames":["Bến nhỏ","Cửa sổ","Cây liễu","Bậc hiên","Bờ giếng"],
+      "objective":"Ánh đèn trong nhà ven sông vẫn sáng. Hãy đến làm quen với từng người.",
+      "gate":"Ghép lời giới thiệu trước cửa nhà.", "unlock":"Cửa nhà mở. Mọi người dọn thêm một chỗ bên bàn."
+    },
+    "r04": {
+      "scene":"river", "locationNames":["Bên bếp","Bậc cầu","Sân gạch","Bến thuyền","Hàng liễu"],
+      "objective":"Cả nhà mang ghế ra hiên. Những đèn bên sân giữ các từ bạn cần để trò chuyện.",
+      "gate":"Ghép lời để tiếp tục câu chuyện ngoài hiên.", "unlock":"Câu chuyện tiếp tục bên hiên nhà, trên sông đèn đã lên."
+    },
+    "r05": {
+      "scene":"school", "locationNames":["Giá sách","Bàn đọc","Bậc thềm","Kệ tre","Cửa kính"],
+      "objective":"Trong thư viện, các thẻ chữ được cất ở những góc quen thuộc.",
+      "gate":"Ghép các thẻ để hoàn thành câu trong sổ thư viện.", "unlock":"Ngăn kéo bàn đọc bật mở. Bạn tìm thấy tờ chỉ dẫn tới dãy sách kế."
+    },
+    "r06": {
+      "scene":"school", "locationNames":["Bàn chép","Góc mực","Giá trúc","Kệ sách","Hiên sau"],
+      "objective":"Tìm quanh gian đọc để thu đủ các mảnh từ còn nằm sai chỗ.",
+      "gate":"Đặt các mảnh từ vào đúng thứ tự trên trang giấy.", "unlock":"Trang giấy nằm ngay ngắn trên bàn. Đèn cuối dãy dẫn bạn ra cửa sau."
+    },
+    "r07": {
+      "scene":"river", "locationNames":["Bồn hoa","Cầu gỗ","Bờ cỏ","Bàn đá","Rặng liễu"],
+      "objective":"Những chiếc đèn trong vườn giữ các từ giúp bạn tả cảnh và kể cảm giác của mình.",
+      "gate":"Đặt lại các từ để gửi một dòng vào sổ bên cầu.", "unlock":"Đèn dưới cầu phản chiếu xuống nước khi bạn ghi xong."
+    },
+    "r08": {
+      "scene":"market", "locationNames":["Biển phố","Mái ngói","Hàng tre","Sạp quà","Quầy gốm"],
+      "objective":"Bạn đến một ngã rẽ có người qua lại. Tìm các từ cần để bắt chuyện và hỏi đường.",
+      "gate":"Ghép lời để cất tiếng với người ở ngã rẽ.", "unlock":"Người đi đường dừng lại và chỉ cho bạn lối giữa hai hàng đèn."
+    },
+    "r09": {
+      "scene":"market", "locationNames":["Góc ngõ","Quầy trà","Bậc đá","Sạp đèn","Tường gạch"],
+      "objective":"Mỗi người ở cuối phố để lại một mẩu lời nhắn. Đọc các đèn để hiểu mẩu cần dùng.",
+      "gate":"Xếp đúng từ để chuyển mẩu lời nhắn ở cuối phố.", "unlock":"Chủ quầy nhận lời nhắn và kéo tấm rèm sang bên."
+    },
+    "r10": {
+      "scene":"school", "locationNames":["Bậc tháp","Cửa vòm","Bàn cân","Ghế gỗ","Hộp đèn"],
+      "objective":"Tìm những từ chỉ số và lượng quanh chân tháp.",
+      "gate":"Xếp lời nhắn ở chân tháp theo thứ tự đọc.", "unlock":"Một dãy đèn trên bậc thang sáng lên, soi lối lên tầng kế."
+    },
+    "r11": {
+      "scene":"school", "locationNames":["Mặt đồng hồ","Cầu thang","Lan can","Hộp gỗ","Chiếu nghỉ"],
+      "objective":"Tiếng chuông dẫn bạn lên một tầng tháp mới. Tìm những đèn đánh dấu giờ và số lượng.",
+      "gate":"Lắp lại dòng chữ mà người giữ tháp để trên chiếu nghỉ.", "unlock":"Tiếng chuông vọng qua mái ngói. Cầu thang xuống ga đã có đèn."
+    },
+    "r12": {
+      "scene":"market", "locationNames":["Phòng vé","Bảng giờ","Băng ghế","Đèn ga","Cổng lên tàu"],
+      "objective":"Tìm các từ ở nhà ga để hiểu lịch hẹn và các mốc trong ngày.",
+      "gate":"Khôi phục dòng tin nhắn trên bảng cạnh phòng vé.", "unlock":"Người coi ga nhận ra lời nhắn và đặt đèn trước cổng."
+    },
+    "r13": {
+      "scene":"market", "locationNames":["Lối vào ga","Quầy nước","Sân ga","Cột giờ","Ghế chờ"],
+      "objective":"Bên kia nhà ga, một người bạn đang chờ tin về giờ gặp.",
+      "gate":"Ghép dòng cần gửi trước khi rời sân ga.", "unlock":"Người bạn nhận được tin và vẫy tay từ phía có ánh đèn."
+    },
+    "r14": {
+      "scene":"river", "locationNames":["Bia vườn","Cầu nhỏ","Chòi nghỉ","Lối sỏi","Hàng liễu"],
+      "objective":"Đường trong vườn chia nhiều ngả. Tìm từ chỉ vị trí trước khi chọn lối qua.",
+      "gate":"Xếp lại dòng chữ chỉ dẫn ở lối sỏi.", "unlock":"Chiếc đèn ở đầu lối sỏi sáng lên. Bạn đã tìm được đường đi."
+    },
+    "r15": {
+      "scene":"market", "locationNames":["Sạp trái cây","Lối xe","Quầy tính tiền","Sạp hàng","Cửa tiệm"],
+      "objective":"Tiếng rao và những chiếc đèn dẫn bạn qua các quầy ở phố mua sắm.",
+      "gate":"Ghép lời cần dùng trước khi rời quầy.", "unlock":"Người bán mỉm cười và chỉ bạn sang quán sáng đèn bên cạnh."
+    },
+    "r16": {
+      "scene":"market", "locationNames":["Bếp","Bàn tre","Quầy trà","Cửa sổ","Bàn cạnh đèn"],
+      "objective":"Quán đang dọn món. Tìm những từ quanh bàn để trò chuyện về bữa ăn.",
+      "gate":"Ghép lời cho người đang phục vụ ở bàn.", "unlock":"Người phục vụ gật đầu. Chiếc đèn bàn tỏa ánh vàng ấm."
+    },
+    "r17": {
+      "scene":"river", "locationNames":["Bàn làm việc","Bậc hiên","Cửa phòng","Sân nhà","Khung cửa sổ"],
+      "objective":"Đi quanh một căn nhà ven bờ để ghép lại các dấu mốc sinh hoạt của chủ nhà.",
+      "gate":"Đặt đúng thứ tự các từ trên mẩu nhật ký.", "unlock":"Bạn đặt mẩu nhật ký lại cạnh ngọn đèn. Ngoài cửa sổ, bờ sông đã yên."
+    },
+    "r18": {
+      "scene":"river", "locationNames":["Mái trú","Bậc đồi","Bên hồ","Hàng cây","Tấm chăn"],
+      "objective":"Mây kéo về bên đồi. Những đèn còn sáng giúp bạn gọi tên thời tiết và cảm giác.",
+      "gate":"Xếp lại lời ghi trên tấm bảng ở chỗ trú.", "unlock":"Gió dịu hẳn. Dọc sườn đồi, đèn dẫn lối về phố hiện ra."
+    },
+    "r19": {
+      "scene":"market", "locationNames":["Chân đèn","Bậc quảng trường","Quầy nước","Vòm phố","Góc chờ"],
+      "objective":"Bạn bè hẹn gặp ở quảng trường. Mỗi góc đèn cất một từ để bắt chuyện.",
+      "gate":"Ghép lời cần nói khi cả nhóm gặp nhau.", "unlock":"Cả nhóm nghe bạn nói. Họ quay về phía con đường sáng đèn."
+    },
+    "r20": {
+      "scene":"market", "locationNames":["Bàn chung","Giếng phố","Đèn lớn","Hàng ghế","Mái lều"],
+      "objective":"Mọi người tập trung quanh chiếc đèn lớn. Hãy dùng những câu đã luyện để cùng trò chuyện.",
+      "gate":"Ghép lời cuối cùng dưới ngọn đèn giữa quảng trường.", "unlock":"Ngọn đèn giữa quảng trường bừng sáng. Mọi người đứng lại nghe lời bạn nói."
+    }
+  },
+  "adventureMissions": {
+    "m001":{"title":"Cất lời ở cổng trường","sentenceId":"bs02","objective":"Cô giáo mở cổng. Bên trong, cả lớp đang chờ một lời chào.","gate":"Ghép lời để chào mọi người trong sân.","unlock":"Cả lớp chào lại. Dãy đèn từ cổng tới cửa lớp bật sáng."},
+    "m002":{"title":"Tìm lớp học","sentenceId":"bs23","objective":"Theo dãy đèn đến cửa lớp, nơi cô giáo đang xếp sách.","gate":"Chào cô giáo trước khi bước vào lớp.","unlock":"Cô giáo mỉm cười và kéo cửa lớp sang bên."},
+    "m003":{"title":"Rước đèn ra sân","sentenceId":"bs04","objective":"Một nhóm bạn vừa đến nhận đèn. Hãy chào họ trước khi cùng ra sân.","gate":"Đứng trước nhóm bạn, bạn mở lời thế nào?","unlock":"Các bạn cầm đèn cùng bạn bước ra sân."},
+    "m004":{"title":"Tạm biệt ở bậc thềm","sentenceId":"bs05","objective":"Buổi tối ở trường kết thúc. Các bạn đứng đợi ở bậc thềm.","gate":"Ghép lời tạm biệt các bạn học trước khi về.","unlock":"Cả lớp vẫy tay. Ở phía phố, một chiếc đèn còn sáng."},
+    "m005":{"title":"Tiếng gọi trong phố","sentenceId":"e093","objective":"Một bạn đứng khuất sau các sạp đèn và cất tiếng gọi bạn.","gate":"Hỏi xem người bạn đang ở đâu.","unlock":"Người bạn bước ra dưới mái hiên và đặt chiếc đèn xuống."},
+    "m006":{"title":"Tên của người cầm đèn","sentenceId":"bs09","objective":"Hai bạn gặp nhau bên quầy trà. Bạn muốn biết tên người bạn mới.","gate":"Ghép câu để hỏi tên bạn ấy.","unlock":"Bạn ấy dừng lại dưới mái đèn, mỉm cười và tự giới thiệu."},
+    "m007":{"title":"Một lần nhận nhầm","sentenceId":"bs12","objective":"Ở góc chợ, một người tưởng bạn là giáo viên trong đoàn.","gate":"Nói với họ rằng bạn không phải giáo viên.","unlock":"Người ấy hiểu ra, gật đầu và nhường lối cho bạn."},
+    "m008":{"title":"Chiếc đèn suýt rơi","sentenceId":"c052","objective":"Tiểu Ngữ vô ý va vào vai bạn, rồi lo lắng quay lại.","gate":"Trấn an Tiểu Ngữ rằng bạn không sao.","unlock":"Tiểu Ngữ thở phào, nhặt chiếc đèn lên rồi đi chậm lại cạnh bạn."},
+    "m009":{"title":"Cùng qua phố đèn","sentenceId":"bs17","objective":"Tiểu Ngữ nói rất vui được làm quen với bạn trước lúc rời phố.","gate":"Đáp lại bằng một lời làm quen.","unlock":"Hai bạn đi tiếp dưới hàng đèn. Phía bờ sông thấp thoáng ánh sáng từ một căn nhà."}
+  },
   "words": [
     {"hanzi":"你好", "pinyin":"nǐhǎo", "vi":"xin chào", "topic":"CON NGƯỜI & GIA ĐÌNH", "memo":"Nhìn người bạn và mỉm cười chào: 你好.", "parts":"你 (bạn) + 好 (tốt)", "example":"你好！", "examplePinyin":"Nǐhǎo!", "exampleVi":"Xin chào!", "bookLesson":1, "emoji":"👋", "id":"w007", "order":1, "parents":["w006", "w040"], "family":["w006", "w040"], "growth":"你 → 你好", "exampleSentenceId":"bs01", "practiceSentences":["e027", "e290", "bs01"], "syllabusEntry":147, "partOfSpeech":"Lời chào"},
     {"hanzi":"大家", "pinyin":"dàjiā", "vi":"mọi người", "topic":"CON NGƯỜI & GIA ĐÌNH", "memo":"Tưởng tượng ngôi nhà thật lớn có mọi người.", "parts":"大 (lớn) + 家 (nhà)", "example":"大家好！", "examplePinyin":"Dàjiā hǎo!", "exampleVi":"Chào mọi người!", "bookLesson":1, "emoji":"👥", "id":"w005", "order":2, "parents":["w004", "w002"], "family":["w004", "w002"], "growth":"大 → 大家", "exampleSentenceId":"bs02", "practiceSentences":["bs02", "bs22"], "syllabusEntry":26, "partOfSpeech":"Đại từ"},

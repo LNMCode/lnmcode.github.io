@@ -1,10 +1,12 @@
 const SCOPE = self.registration.scope;
 const CACHE_PREFIX = `han-ngu-hsk1:${SCOPE}:`;
-const CACHE = `${CACHE_PREFIX}local-v4`; // Replaced with the commit SHA in the Pages artifact.
+const VERSION = 'local-v6'; // Replaced with the commit SHA in the Pages artifact.
+const CACHE = CACHE_PREFIX + VERSION;
 const APP_SHELL = new URL('index.html', SCOPE).href;
 const CORE = new Set([
   'index.html', 'styles.css', 'boot.js', 'data.js', 'engine.js', 'app.js',
-  'manifest.webmanifest', 'icon-192.png', 'icon-512.png'
+  'manifest.webmanifest', 'icon-192.png', 'icon-512.png',
+  'art/school.webp', 'art/market.webp', 'art/river.webp'
 ].map(path => new URL(path, SCOPE).href));
 
 self.addEventListener('install', event => {
