@@ -3,36 +3,36 @@
 
   const games = Object.freeze({
     wind: {
-      name: 'Đường Gió', glyph: '风', ability: 'Nhận diện từ',
-      description: 'Lái diều qua những cổng chữ dọc đường đêm.',
+      name: 'Đường Gió', glyph: '风', ability: 'Nghĩa → chữ Hán',
+      description: 'Chọn chữ Hán để chặn thiên thạch trước khi chạm thành.',
     },
     echo: {
-      name: 'Trạm Vọng Âm', glyph: '声', ability: 'Nghe và ghi Pinyin',
-      description: 'Bắt sóng Quan thoại và gõ lại để nối các trạm.',
+      name: 'Trạm Vọng Âm', glyph: '声', ability: 'Nghĩa → Pinyin',
+      description: 'Đọc nghĩa đang rơi, nhớ Pinyin và đón từng giọt.',
     },
     riddle: {
-      name: 'Mật Mã Âm Tiết', glyph: '锁', ability: 'Âm đầu, vần và thanh',
-      description: 'Chỉnh ba vòng âm để mở khóa bằng Pinyin.',
+      name: 'Mật Mã Âm Tiết', glyph: '锁', ability: 'Nhớ cách viết Pinyin',
+      description: 'Đoán cách viết Pinyin từ nghĩa tiếng Việt trong sáu lượt.',
     },
     lights: {
       name: 'Hồ Đom Đóm', glyph: '萤', ability: 'Gọi lại từ theo nghĩa',
-      description: 'Thắp hai chữ theo thứ tự để bắc một vệt sáng qua hồ.',
+      description: 'Theo dấu các bong bóng đang bơi và chạm vào chữ đúng nghĩa.',
     },
     pinyin: {
       name: 'Sao Pinyin', glyph: '音', ability: 'Phát âm và thanh điệu',
-      description: 'Ngắm các ngôi sao chữ Hán, gõ Pinyin để phóng luồng sáng.',
+      description: 'Gõ Pinyin để bắn những tinh thể chữ Hán đang rơi.',
     },
     strokes: {
       name: 'Dấu Mực', glyph: '笔', ability: 'Thứ tự nét',
-      description: 'Dùng ngón tay đặt từng nét đúng hướng để hoàn thành chữ.',
+      description: 'Dẫn mực theo từng nét để tạo con dấu từ trí nhớ.',
     },
     pairs: {
       name: 'Đèn Đôi', glyph: '双', ability: 'Nhớ mặt chữ và nghĩa',
-      description: 'Lật đèn úp và tìm hai chiếc mang cùng một từ.',
+      description: 'Nối chữ Hán và nghĩa để giải phóng từng cặp đèn trên bàn.',
     },
     flow: {
       name: 'Dòng Chữ', glyph: '舟', ability: 'Trật tự từ trong câu',
-      description: 'Đón các thuyền chữ và xếp thành câu để đưa thuyền qua bến.',
+      description: 'Xếp các mảnh chữ thành cầu để đưa Cáo Đèn qua sông.',
     },
   });
 

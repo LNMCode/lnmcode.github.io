@@ -282,20 +282,32 @@ h1, .section-title h2 { color: #fff1dc; }
 .station-caption span { color: var(--muted); font-size: .84rem; margin-top: 3px; }
 .station-caption .btn { min-width: 88px; }
 
-.arcade-main { max-width: 700px; margin-inline: auto; }
-.arcade-main .film-stage { height: clamp(136px, 39vw, 226px); margin-bottom: 10px; }
+#app.arcade-shell {
+  max-width: 1260px;
+  background: linear-gradient(170deg, #1d192b, #141321 45rem);
+}
+.arcade-main { --page-gutter: clamp(12px, 3vw, 26px); }
+#arcade-game { min-width: 0; }
 .arcade-game-header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0 8px;
-  padding: 5px 0 11px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  margin-bottom: 8px;
 }
-.arcade-game-header .back-link { margin: 0; justify-self: start; }
+.arcade-game-header .back-link {
+  justify-content: center;
+  margin: 0;
+  min-width: 44px;
+  border-radius: 12px;
+  padding-inline: 8px;
+  color: var(--stage-light);
+  background: color-mix(in srgb, var(--stage-stone) 56%, #161222);
+}
 .arcade-game-header h1 {
-  grid-row: 2;
-  grid-column: 1 / -1;
   font-family: var(--display);
-  font-size: clamp(1.8rem, 6.3vw, 3rem);
+  font-size: clamp(1.32rem, 4.3vw, 2.55rem);
   line-height: 1.1;
   letter-spacing: -.045em;
 }
@@ -345,7 +357,7 @@ h1, .section-title h2 { color: #fff1dc; }
 .film-stage-ending { margin-bottom: 21px; }
 .adventure-panel > .adventure-heading { margin-bottom: 10px; }
 
-.cinema-scene-entry > :is(.hero, .arcade-lobby, .adventure-panel, .adventure-gate, .quest-screen, .finish, .chapter-title, #arcade-game) {
+.cinema-scene-entry > :is(.hero, .arcade-lobby, .adventure-panel, .adventure-gate, .quest-screen, .finish, .chapter-title) {
   animation: cinema-arrive .52s cubic-bezier(.22,.68,.27,1) both;
 }
 @keyframes cinema-arrive {
@@ -375,27 +387,14 @@ h1, .section-title h2 { color: #fff1dc; }
   .story-hero .hero-body { grid-column: 1; grid-row: 1; }
   .story-hero h1 { font-size: clamp(2.55rem, 5.3vw, 3.8rem); }
 }
-@media (min-width: 820px) {
-  .arcade-main {
-    max-width: var(--shell);
-    display: grid;
-    grid-template-columns: minmax(0, 37fr) minmax(0, 63fr);
-    grid-template-rows: auto 1fr;
-    gap: 2px 18px;
-    align-items: start;
+@media (max-width: 520px) {
+  .arcade-game-header {
+    grid-template-columns: auto minmax(0, 1fr);
   }
-  .arcade-game-header { grid-column: 1/-1; }
-  .arcade-main .film-stage {
-    position: sticky;
-    top: 18px;
-    height: clamp(230px, 25vw, 306px);
-    margin: 0;
-  }
-  #arcade-game { min-width: 0; }
+  .arcade-game-header .back-link span, .arcade-game-header .game-skill { display: none; }
 }
 @media (max-width: 360px) {
   .story-hero h1 { font-size: clamp(1.95rem, 8vw, 2.6rem); }
-  .game-skill { max-width: 14em; }
 }
 @media (prefers-reduced-motion: reduce) {
   .cinema-scene-entry > * { animation: none; }

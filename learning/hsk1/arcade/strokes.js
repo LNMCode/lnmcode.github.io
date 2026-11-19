@@ -87,7 +87,12 @@
     const ended = !drawing;
     const history = glyph.outlines.slice(0, stroke).map(path => `<path d="${esc(path)}"></path>`).join('');
     const outline = showModel && !ended ? glyph.outlines.map(path => `<path d="${esc(path)}"></path>`).join('') : '';
-    return `<div class="ink-desk"><div class="ink-paper${burst ? ' ink-paper--sealed' : ''}"><svg class="ink-board${burst ? ' ink-board--sealed' : ''}" data-cinema-stage data-stroke-board data-stroke-count="${stroke}"
+    return `<div class="ink-desk" data-arena-surface>
+      <div class="ink-charge" role="meter" aria-label="Mức khắc dấu" aria-valuemin="0" aria-valuemax="${glyph.medians.length}" aria-valuenow="${stroke}" style="--charge:${stroke / glyph.medians.length}">
+        <span class="ink-charge-track" aria-hidden="true"><i></i></span>
+        <span class="ink-charge-seal" aria-hidden="true"><i data-arena-model="seal"></i><b>印</b></span>
+      </div>
+      <div class="ink-paper${burst ? ' ink-paper--sealed' : ''}"><svg class="ink-board${burst ? ' ink-board--sealed' : ''}" data-stroke-board data-stroke-count="${stroke}"
       viewBox="0 0 1024 1024" role="img" aria-label="Ô viết chữ Hán, kéo một nét từ đầu tới cuối"
       preserveAspectRatio="none" focusable="false">
       <path class="ink-grid" d="M0 512H1024M512 0V1024M0 0L1024 1024M1024 0L0 1024"></path>
@@ -120,6 +125,10 @@
     let showingHint = false;
     let hadHint = false;
     let effect = false;
+    let demoFrame = 0;
+    let demoActive = false;
+    const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+    const still = () => ctx.lowMotion || reduceMotion.matches;
 
     function focusHeading() {
       root.querySelector('[data-stroke-title]')?.focus({ preventScroll: true });
@@ -148,6 +157,7 @@
           : phase === 'recall'
             ? '<button type="button" class="btn button-soft" data-stroke-action="hint">Xem gợi ý nét</button><button type="button" class="btn button-text" data-stroke-action="next" data-stroke-next>Bỏ qua lượt nhớ</button>'
             : '<button type="button" class="btn button-soft" data-stroke-action="restart">Viết lại từ đầu</button>';
+      const demo = isDrawing ? '<button type="button" class="btn button-text" data-stroke-action="demo">Xem nét chạy mẫu</button>' : '';
 
       root.innerHTML = `<section class="ink-game${ctx.lowMotion ? ' ink-game--still' : ''}" aria-labelledby="ink-game-title">
         <header class="ink-header"><div class="ink-title">
@@ -155,17 +165,17 @@
           <h2 id="ink-game-title" data-stroke-title tabindex="-1">${title}</h2>
         </div><div class="ink-seals" aria-label="Các dấu đã khắc">${seals}</div></header>
         ${phase === 'intro' ? `<p class="ink-intro">Kéo từng nét đúng thứ tự để khắc ${selected.length} dấu chữ. Sau khi thấy mẫu, thử tự viết lại từ nghĩa và Pinyin.</p>
-          <div class="ink-cover" data-cinema-stage aria-hidden="true"><i></i>${selected.map(item => `<span lang="zh-Hans">${esc(item.hanzi)}</span>`).join('')}</div>
+          <div class="ink-cover" aria-hidden="true"><i></i>${selected.map(item => `<span lang="zh-Hans">${esc(item.hanzi)}</span>`).join('')}</div>
           <button type="button" class="btn primary full" data-stroke-action="start" data-stroke-start>Bắt đầu viết</button>
           <p class="ink-attribution">Bộ 30 chữ HSK 1 dùng dữ liệu từ Make Me a Hanzi và Hanzi Writer Data. <a href="./arcade/ARPHICPL.TXT" target="_blank" rel="noopener">Giấy phép Arphic</a>.</p>`
-          : phase === 'finished' ? `<div class="ink-cover ink-cover--reward" data-cinema-stage><i aria-hidden="true"></i>${selected.map(item => `<span lang="zh-Hans">${esc(item.hanzi)}</span>`).join('')}</div>
+          : phase === 'finished' ? `<div class="ink-cover ink-cover--reward"><i aria-hidden="true"></i>${selected.map(item => `<span lang="zh-Hans">${esc(item.hanzi)}</span>`).join('')}</div>
           <p class="ink-score"><strong>${totalScore}</strong> điểm</p>
           <div class="ink-controls"><button type="button" class="btn primary" data-stroke-action="replay" data-stroke-replay>Chơi lại</button>
           <button type="button" class="btn button-soft" data-stroke-action="exit">Về sân chơi</button></div>`
           : `<div class="ink-word">${revealCharacter ? `<strong lang="zh-Hans">${esc(word.hanzi)}</strong>` : ''}<div><b>${esc(word.pinyin)}</b><span>${esc(word.vi)}</span></div>${isDrawing ? `<small>Nét ${stroke + 1}/${record.medians.length}</small>` : ''}</div>
           ${boardMarkup(record, stroke, phase === 'guide' || showingHint, isDrawing, effect)}
           <p class="ink-feedback${note && isDrawing ? ' ink-feedback--retry' : ''}" role="status">${esc(status)}</p>
-          <div class="ink-controls">${actions}</div>`}
+          <div class="ink-controls">${actions}${demo}</div>`}
       </section>`;
     }
 
@@ -192,13 +202,11 @@
         phase = 'finished';
         render();
         focusHeading();
-        ctx.motion?.('reward', root.querySelector('.ink-cover--reward'));
         ctx.complete(totalScore);
         return;
       }
       position += 1;
       enterDrawing('guide');
-      ctx.motion?.('collect', root.querySelectorAll('.ink-seal--lit')[position - 1], {glyph: selected[position].hanzi});
     }
 
     function enterDrawing(next) {
@@ -211,11 +219,15 @@
       hadHint = false;
       render();
       focusHeading();
-      ctx.motion?.('round', root.querySelector('[data-stroke-board]'), {glyph: selected[position].hanzi});
     }
 
     function click(event) {
       const action = event.target.closest('[data-stroke-action]')?.dataset.strokeAction;
+      if (demoActive || pointer) return;
+      if (action === 'demo' && ['guide', 'recall'].includes(phase)) {
+        demonstrate();
+        return;
+      }
       if (action === 'start' && phase === 'intro') enterDrawing('guide');
       if (action === 'recall' && phase === 'ready') enterDrawing('recall');
       if (action === 'restart' && phase === 'guide') enterDrawing('guide');
@@ -224,9 +236,7 @@
         hadHint = true;
         note = 'Điểm sáng là nơi bắt đầu nét.';
         render();
-        const [start] = data[selected[position].hanzi].medians[stroke];
-        const board = root.querySelector('[data-stroke-board]');
-        ctx.motion?.('hint', board, {x: start[0] / 1024, y: start[1] / 1024});
+        root.querySelector('[data-stroke-action="hint"]')?.focus({preventScroll:true});
       }
       if (action === 'next' && ['ready', 'done', 'recall'].includes(phase)) advance();
       if (action === 'replay' && phase === 'finished') {
@@ -240,35 +250,58 @@
     }
 
     function startStroke(event) {
-      if (pointer || !['guide', 'recall'].includes(phase) || (event.pointerType === 'mouse' && event.button !== 0)) return;
+      if (pointer || demoActive || !['guide', 'recall'].includes(phase) || (event.pointerType === 'mouse' && event.button !== 0)) return;
       const svg = event.target.closest('[data-stroke-board]');
       if (!svg) return;
       event.preventDefault();
       svg.setPointerCapture(event.pointerId);
+      const point = fitPoint(svg, event);
+      pointer = {...createMark(svg, point, event.pressure), id:event.pointerId};
+    }
+
+    function createMark(svg, point, pressure) {
       const ink = document.createElementNS(svgNamespace, 'polyline');
       ink.setAttribute('class', 'ink-paint');
-      const point = fitPoint(svg, event);
       ink.setAttribute('points', pointList([point]));
-      const nib = document.createElementNS(svgNamespace, 'circle');
-      nib.setAttribute('class', 'ink-nib');
-      placeNib(nib, point, event.pressure);
+      const nib = document.createElementNS(svgNamespace, 'g');
+      nib.setAttribute('class', 'ink-live-nib');
+      const glow = document.createElementNS(svgNamespace, 'circle');
+      glow.setAttribute('class', 'ink-nib-glow');
+      glow.setAttribute('r', '36');
+      const head = document.createElementNS(svgNamespace, 'circle');
+      head.setAttribute('class', 'ink-nib');
+      nib.append(glow, head);
+      placeNib(nib, point, pressure);
       svg.append(ink, nib);
-      pointer = { id: event.pointerId, svg, ink, nib, points: [point] };
+      const glyph = data[selected[position].hanzi];
+      const goal = cumulativeDistances(glyph.medians[stroke]).at(-1);
+      return {svg, ink, nib, points:[point], travel:0, goal};
     }
 
     function placeNib(nib, [x, y], pressure) {
-      nib.setAttribute('cx', x);
-      nib.setAttribute('cy', y);
-      nib.setAttribute('r', 11 + 13 * pressure);
+      nib.setAttribute('transform', `translate(${x} ${y})`);
+      nib.lastElementChild.setAttribute('r', 11 + 13 * pressure);
+    }
+
+    function charge(mark) {
+      const count = data[selected[position].hanzi].medians.length;
+      const fraction = Math.min(.9, mark.travel / mark.goal);
+      mark.svg.closest('.ink-desk').querySelector('.ink-charge').style.setProperty('--charge', (stroke + fraction) / count);
+    }
+
+    function extendMark(mark, point, pressure) {
+      mark.travel += distance(mark.points.at(-1), point);
+      mark.points.push(point);
+      mark.ink.setAttribute('points', pointList(mark.points));
+      placeNib(mark.nib, point, pressure);
+      charge(mark);
     }
 
     function moveStroke(event) {
       if (event.pointerId !== pointer?.id) return;
       const point = fitPoint(pointer.svg, event);
       if (distance(pointer.points.at(-1), point) < 4 || pointer.points.length >= 512) return;
-      pointer.points.push(point);
-      pointer.ink.setAttribute('points', pointList(pointer.points));
-      placeNib(pointer.nib, point, event.pressure);
+      extendMark(pointer, point, event.pressure);
     }
 
     function closePointer(event) {
@@ -279,13 +312,19 @@
       if (event.type !== 'pointerup') {
         trace.ink.remove();
         trace.nib.remove();
+        trace.travel = 0;
+        charge(trace);
         return;
       }
 
       const last = fitPoint(trace.svg, event);
       if (distance(trace.points.at(-1), last) >= 1) trace.points.push(last);
+      resolveTrace(trace.points, last);
+    }
+
+    function resolveTrace(points, last, fromDemo = false) {
       const glyph = data[selected[position].hanzi];
-      const outcome = matchStroke(trace.points, glyph.medians[stroke]);
+      const outcome = matchStroke(points, glyph.medians[stroke]);
       if (outcome !== 'good') {
         mistakes += 1;
         note = strokeMessages[outcome];
@@ -297,19 +336,70 @@
       }
       render();
       const board = root.querySelector('[data-stroke-board]');
-      const ink = {x: last[0] / 1024, y: last[1] / 1024, index: stroke,
-        progress: stroke / glyph.medians.length, glyph: selected[position].hanzi};
-      if (outcome !== 'good') {
-        ctx.motion?.('miss', board, ink);
+      if (outcome === 'good') {
+        board.classList.add('ink-board--wet');
+        if (!still()) absorbInk(board, last);
+      } else {
+        board.classList.add('ink-board--miss');
+      }
+      if (fromDemo) {
+        root.querySelector('[data-stroke-action="demo"], [data-stroke-action="recall"], [data-stroke-next]')?.focus({preventScroll:true});
+      }
+    }
+
+    function absorbInk(board, last) {
+      const paper = board.getBoundingClientRect();
+      const desk = board.closest('.ink-desk');
+      const bounds = desk.getBoundingClientRect();
+      const seal = desk.querySelector('.ink-charge-seal').getBoundingClientRect();
+      const spark = document.createElement('i');
+      spark.className = 'ink-flying';
+      spark.style.left = `${(paper.left - bounds.left) + last[0] / 1024 * paper.width}px`;
+      spark.style.top = `${(paper.top - bounds.top) + last[1] / 1024 * paper.height}px`;
+      const dx = seal.left + seal.width / 2 - (paper.left + last[0] / 1024 * paper.width);
+      const dy = seal.top + seal.height / 2 - (paper.top + last[1] / 1024 * paper.height);
+      desk.append(spark);
+      if (!spark.animate) { spark.remove(); return; }
+      spark.animate([
+        {transform:'translate(-50%, -50%) scale(.7)', opacity:1},
+        {transform:`translate(${dx * .5}px, ${dy * .65}px) scale(1)`, opacity:1, offset:.45},
+        {transform:`translate(${dx}px, ${dy}px) scale(.3)`, opacity:0},
+      ], {duration:470, easing:'cubic-bezier(.32,.64,.52,1)'}).onfinish = () => spark.remove();
+    }
+
+    function demonstrate() {
+      const board = root.querySelector('[data-stroke-board]');
+      const model = data[selected[position].hanzi].medians[stroke];
+      const last = model.at(-1);
+      if (phase === 'recall') hadHint = true;
+      if (still()) {
+        resolveTrace(model, last, true);
         return;
       }
-      const [firstX, firstY] = trace.points[0];
-      const bounds = board.getBoundingClientRect();
-      const from = {x: (bounds.left + firstX / 1024 * bounds.width) / window.innerWidth,
-        y: (bounds.top + firstY / 1024 * bounds.height) / window.innerHeight};
-      board.classList.add('ink-board--wet');
-      ctx.motion?.('ink', board, {...ink, from});
-      if (effect) ctx.motion?.('seal', root.querySelector('.ink-stamped'), ink);
+      const mark = createMark(board, model[0], .5);
+      const distances = cumulativeDistances(model);
+      const length = distances.at(-1);
+      demoActive = true;
+      const start = performance.now();
+      let sample = 1;
+      function trace(now) {
+        const progress = Math.min(1, (now - start) / Math.min(950, 440 + length * .55));
+        const traveled = progress * length;
+        while (sample < model.length - 1 && distances[sample] < traveled) {
+          extendMark(mark, model[sample], .5);
+          sample += 1;
+        }
+        const span = distances[sample] - distances[sample - 1];
+        const fraction = span ? (traveled - distances[sample - 1]) / span : 1;
+        const point = model[sample - 1].map((value, axis) => value + fraction * (model[sample][axis] - value));
+        mark.ink.setAttribute('points', pointList([...mark.points, point]));
+        placeNib(mark.nib, point, .5);
+        if (progress === 1) {
+          demoActive = false;
+          resolveTrace(model, last, true);
+        } else demoFrame = requestAnimationFrame(trace);
+      }
+      demoFrame = requestAnimationFrame(trace);
     }
 
     root.addEventListener('click', click);
@@ -321,6 +411,7 @@
     render();
 
     return () => {
+      cancelAnimationFrame(demoFrame);
       root.removeEventListener('click', click);
       root.removeEventListener('pointerdown', startStroke);
       root.removeEventListener('pointermove', moveStroke);

@@ -2,23 +2,52 @@ const assert = require('node:assert/strict');
 const { chromium, devices } = require(process.env.HSK_PLAYWRIGHT_MODULE || 'playwright');
 const url = process.argv[2] || 'http://127.0.0.1:8975/learning/hsk1/';
 
-async function pinyin(page) {
-  const input = page.locator('[data-pinyin-input]');
-  const paused = page.locator('[data-pinyin-pause]');
-  await paused.click();
-  assert.equal(await input.getAttribute('readonly'), '');
-  await paused.click();
-  await input.fill('xxx');
-  await input.press('Enter');
-  assert.equal(await page.locator('[data-pinyin-score]').textContent(), '0');
-  for (let i = 0; i < 8; i++) {
-    const target = page.locator('[data-pinyin-target][aria-pressed="true"]:enabled');
-    const id = await target.getAttribute('data-pinyin-target');
-    const reading = await page.evaluate(wordId => window.HSK_ENGINE.W[wordId].pinyin, id);
-    await input.fill(reading);
-    await input.press('Enter');
+const currentTarget = page => page.locator('[data-falling-target][data-word-id]:visible').first();
+
+async function falling(page, game) {
+  await page.locator('[data-falling-start="calm"]').click();
+  const input = page.locator('[data-falling-entry]');
+  const replay = page.locator('[data-falling-replay]');
+  const pause = page.locator('[data-falling-pause]');
+  if (await pause.isVisible()) {
+    await pause.click();
+    await page.locator('[data-falling-resume]').click();
   }
-  await page.locator('[data-pinyin-replay]').waitFor();
+  const solved = new Set();
+  while (solved.size < 8) {
+    const target = currentTarget(page);
+    await target.waitFor();
+    const id = await target.getAttribute('data-word-id');
+    assert.ok(!solved.has(id), 'A cleared target stayed in the board.');
+    if (game === 'wind') {
+      await page.locator(`[data-falling-option][data-word-id="${id}"]`).click();
+    } else {
+      const reading = await page.evaluate(id => window.HSK_ENGINE.W[id].pinyin, id);
+      await input.fill(reading);
+      await input.press('Enter');
+    }
+    solved.add(id);
+    await page.locator(`[data-falling-target][data-word-id="${id}"]`).waitFor({state:'hidden'});
+  }
+  await replay.waitFor();
+}
+
+async function movingTarget(page, webgl) {
+  await page.locator('[data-falling-start="timed"]').click();
+  const board = page.locator('[data-falling-board]');
+  const marker = board.locator('[data-falling-target] [data-arena-model]').first();
+  await marker.waitFor();
+  if (webgl) await page.locator('#hsk-cinema[data-arena-visual="3d"]').waitFor({state:'attached'});
+  const before = await marker.boundingBox();
+  await page.waitForFunction(y => {
+    const model = document.querySelector('[data-falling-target] [data-arena-model]');
+    return model && model.getBoundingClientRect().y > y + 4;
+  }, before.y);
+  await page.locator('[data-falling-pause]').click();
+  await board.locator('[data-falling-target]').first().waitFor({state:'attached'});
+  const resting = await marker.boundingBox();
+  await new Promise(resolve => setTimeout(resolve, 210));
+  assert.ok(Math.abs((await marker.boundingBox()).y - resting.y) < 2, 'Target moved while paused.');
 }
 
 async function writeStroke(page, points) {
@@ -56,20 +85,26 @@ async function strokes(page) {
 }
 
 async function pairs(page) {
-  const card = index => page.locator(`[data-pairs-card="${index}"]`);
-  const count = await page.locator('[data-pairs-card]').count();
+  const cards = page.locator('[data-pairs-card]');
+  const count = await cards.count();
   assert.equal(count, 8);
-  assert.equal(await card(0).locator('.pair-card-value').textContent(), '');
-  for (let first = 0; first < count; first++) {
-    if (await card(first).getAttribute('aria-disabled') === 'true') continue;
-    for (let second = first + 1; second < count; second++) {
-      if (await card(second).getAttribute('aria-disabled') === 'true') continue;
-      await card(first).click();
-      await card(second).click();
-      if (await card(first).evaluate(element => element.classList.contains('is-paired'))) break;
-      const dismiss = page.locator('[data-pairs-continue]');
-      if (await dismiss.isVisible()) await dismiss.click();
-    }
+  assert.ok((await cards.first().locator('.pair-card-value').textContent()).trim());
+  const matches = await cards.evaluateAll(nodes => nodes
+    .filter(node => node.dataset.side === 'hanzi')
+    .map(node => {
+      const text = node.querySelector('.pair-card-value').textContent.trim();
+      const word = window.HSK_ENGINE.D.words.find(word => word.hanzi === text);
+      const opposite = nodes.find(other => other.dataset.side !== 'hanzi' &&
+        other.querySelector('.pair-card-value').textContent.trim() === word?.vi);
+      return [node.dataset.pairsCard, opposite?.dataset.pairsCard];
+    }));
+  assert.equal(matches.length, 4);
+  const byIndex = index => page.locator(`[data-pairs-card="${index}"]`);
+  for (const [chinese, vietnamese] of matches) {
+    assert.ok(vietnamese !== undefined);
+    await byIndex(chinese).click();
+    await byIndex(vietnamese).click();
+    await page.locator(`[data-pairs-card="${chinese}"].is-paired`).waitFor({state:'attached'});
   }
   await page.locator('[data-pairs-replay]').waitFor();
 }
@@ -79,16 +114,26 @@ async function flow(page) {
     const hint = page.locator('[data-flow-hint]');
     const slots = await page.locator('[data-flow-slot]').count();
     assert.ok(slots >= 2);
+    if (round === 0) {
+      await hint.click();
+      const clue = (await page.locator('[data-flow-status]').textContent()).match(/là (.+)\.$/)?.[1];
+      assert.ok(clue);
+      const tiles = page.locator('[data-flow-tile]:enabled');
+      const wrong = tiles.nth((await tiles.allTextContents()).findIndex(label => label.trim() !== clue));
+      await wrong.click();
+      for (let i = 1; i < slots; i++) await tiles.first().click();
+      await page.locator('[data-flow-send]').click();
+      await page.locator('[data-flow-slot][data-wrong]').waitFor();
+      await page.locator('[data-flow-repair]').click();
+      assert.equal(await page.locator('[data-flow-slot][data-filled]').count(), 0);
+    }
     for (let i = 0; i < slots; i++) {
       await hint.click();
-      const status = await page.locator('.flow-game [role="status"]').textContent();
+      const status = await page.locator('[data-flow-status]').textContent();
       const tile = status.match(/là (.+)\.$/)?.[1];
-      assert.ok(tile);
-      const boat = page.getByRole('button', { name: `Vớt mảnh ${tile}`, exact: true }).first();
-      for (let turn = 0; turn < slots && !(await boat.count()); turn++) {
-        await page.locator('[data-flow-cycle]').click();
-      }
-      await boat.click();
+      assert.ok(tile, status);
+      await page.getByRole('button', {name:`Lắp mảnh ${tile}`, exact:true}).and(page.locator(':enabled')).first().click();
+      assert.equal(await page.locator('[data-flow-slot][data-filled]').count(), i + 1);
     }
     await page.locator('[data-flow-send]').click();
     const finish = round === 3 ? '[data-flow-replay]' : '[data-flow-next]';
@@ -97,114 +142,45 @@ async function flow(page) {
   }
 }
 
-async function wind(page) {
-  let triedWrong = false;
-  let checkpoints = 0;
-  while (!(await page.locator('[data-wind-replay]').isVisible()) && checkpoints < 8) {
-    const clue = await page.locator('[data-wind-clue]').textContent();
-    const reading = (await page.locator('[data-wind-clue-kind]').textContent()).includes('Pinyin');
-    const ids = await page.locator('[data-wind-lane]').evaluateAll(lanes => lanes.map(lane => lane.dataset.word));
-    const answer = await page.evaluate(({ids, clue, reading}) =>
-      ids.find(id => window.HSK_ENGINE.W[id]?.[reading ? 'pinyin' : 'vi'] === clue), {ids, clue, reading});
-    assert.ok(answer);
-    const choice = triedWrong ? answer : ids.find(id => id && id !== answer);
-    await page.locator(`[data-wind-lane][data-word="${choice}"]`).click();
-    await page.locator('[data-wind-cross]').click();
-    assert.equal(await page.locator('[data-wind-stage]').getAttribute('data-flight'), triedWrong ? 'pass' : 'miss');
-    triedWrong = true;
-    checkpoints++;
-    await page.locator('[data-wind-next]').click();
-  }
-  assert.equal(checkpoints, 7);
-  await page.locator('[data-wind-replay]').waitFor();
-}
-
-async function echo(page) {
-  for (let round = 0; round < 5; round++) {
-    for (const band of await page.locator('[data-echo-frequency]').all()) {
-      await band.click();
-      if (await page.locator('.echo-radio').getAttribute('data-signal') === '3') break;
-    }
-    const meaning = page.locator('[data-echo-meaning]');
-    await meaning.waitFor();
-    const clue = await meaning.textContent();
-    const readings = await page.evaluate(value =>
-      window.HSK_ENGINE.D.words.filter(word => word.vi === value).map(word => word.pinyin), clue);
-    const input = page.locator('[data-echo-input]');
-    for (const reading of readings) {
-      await input.fill(reading);
-      await input.press('Enter');
-      if (await page.locator('[data-echo-answer]').isVisible()) break;
-    }
-    await page.locator('[data-echo-next]').click();
-  }
-  await page.locator('[data-echo-replay]').waitFor();
-}
-
 async function riddle(page) {
-  for (let round = 0; round < 5; round++) {
-    const glyph = await page.locator('[data-riddle-word]').textContent();
-    const answer = await page.evaluate(hanzi => {
-      const options = part => [...document.querySelector(`[data-riddle-part="${part}"]`).options]
-        .map(option => option.value).filter(Boolean);
-      const engine = window.HSK_ENGINE;
-      const word = engine.D.words.find(item => item.hanzi === hanzi);
-      for (const onset of options('onset')) {
-        for (const rime of options('rime')) {
-          for (const tone of options('tone')) {
-            if (engine.matchPinyin((onset === '∅' ? '' : onset) + rime + tone, word) === 'good') {
-              return {onset, rime, tone};
-            }
-          }
-        }
-      }
-    }, glyph);
-    assert.ok(answer);
+  const roundLabel = await page.locator('[data-riddle-round]').textContent();
+  const rounds = Number(roundLabel.split('/')[1]);
+  assert.ok(rounds >= 3);
+  for (let round = 0; round < rounds; round++) {
+    const meaning = await page.locator('[data-riddle-meaning]').textContent();
+    const input = page.locator('[data-riddle-input]');
+    const reading = await page.evaluate(meaning =>
+      window.HSK_ENGINE.D.words.find(word => word.vi === meaning)?.pinyin, meaning);
+    assert.ok(reading, meaning);
     if (round === 0) {
-      await page.locator('[data-riddle-part="onset"]').selectOption(answer.onset);
-      await page.locator('[data-riddle-part="rime"]').selectOption(answer.rime);
-      await page.locator('[data-riddle-part="tone"]').selectOption(answer.tone === '1' ? '2' : '1');
-      await page.locator('[data-riddle-try]').click();
-      await page.locator('[data-riddle-dial="tone"][data-state="missed"]').waitFor();
-      await page.locator('[data-riddle-hint]').click();
-    } else {
-      for (const [part, value] of Object.entries(answer)) {
-        await page.locator(`[data-riddle-part="${part}"]`).selectOption(value);
-      }
+      const count = Number((await page.locator('[data-riddle-count]').textContent()).split(' ')[0]);
+      await input.fill('x'.repeat(count));
+      await input.press('Enter');
+      assert.equal(await page.locator('[data-riddle-guess]').count(), 1);
     }
-    await page.locator('[data-riddle-try]').click();
-    await page.locator('[data-riddle-lock].is-open').waitFor();
-    if (round < 4) await page.locator('[data-riddle-next]').click();
+    await input.fill(reading);
+    await input.press('Enter');
+    await page.locator('[data-riddle-result]').waitFor();
+    if (round < rounds - 1) await page.locator('[data-riddle-next]').click();
   }
   await page.locator('[data-riddle-replay]').waitFor();
 }
 
 async function lights(page) {
-  const mode = page.locator('[data-lights-mode]');
-  const pause = page.locator('[data-lights-pause]');
-  await mode.click();
-  await pause.click();
-  assert.equal(await page.locator('[data-lights-lake]').getAttribute('data-paused'), '');
-  await pause.click();
-  await mode.click();
-  for (let round = 0; round < 5; round++) {
-    const board = page.locator('[data-lights-lake]');
-    for (let step = 0; step < 2; step++) {
-      const clue = await page.locator('.lights-clues [aria-current="step"]').textContent();
-      const ids = await board.locator('[data-lights-word]').evaluateAll(pads => pads.map(pad => pad.dataset.lightsWord));
-      const target = await page.evaluate(({ids, clue}) =>
-        ids.find(id => window.HSK_ENGINE.W[id].vi === clue), {ids, clue});
-      assert.ok(target);
-      if (round === 0 && step === 0) {
-        const wrong = ids.find(id => id !== target);
-        await board.locator(`[data-lights-word="${wrong}"]`).click();
-        await page.locator('[data-lights-hint]').click();
-        assert.equal(await board.locator('.is-hinted').getAttribute('data-lights-word'), target);
-      }
-      await board.locator(`[data-lights-word="${target}"]`).click();
+  await page.locator('[data-lights-calm]').click();
+  const board = page.locator('[data-lights-lake]');
+  for (let round = 0; round < 8; round++) {
+    const clue = await page.locator('[data-lights-clue]').textContent();
+    const ids = await board.locator('[data-lights-word]').evaluateAll(nodes => nodes.map(node => node.dataset.lightsWord));
+    const id = await page.evaluate(({ids,clue}) =>
+      ids.find(id => window.HSK_ENGINE.W[id].vi === clue), {ids,clue});
+    assert.ok(id, clue);
+    if (round === 0) {
+      await board.locator(`[data-lights-word="${ids.find(value => value !== id)}"]`).click();
+      await board.locator('.is-popped').waitFor({state:'attached'});
     }
-    assert.equal(await board.locator('button.is-lit').count(), 2);
-    if (round < 4) await page.locator('[data-lights-next]').click();
+    await board.locator(`[data-lights-word="${id}"]`).click();
+    if (round < 7) await page.locator('[data-lights-next]').click();
   }
   await page.locator('[data-lights-replay]').waitFor();
 }
@@ -267,42 +243,39 @@ async function run() {
     assert.equal(await station.getAttribute('aria-pressed'), 'true');
     assert.equal(await canvas.getAttribute('data-focus'), '7');
     await page.locator('[data-feature-play]').click();
-    await page.locator('[data-cinema-cover][data-palette="flow"]').waitFor();
+    await page.locator('[data-flow-send]').waitFor();
     assert.equal(await canvas.getAttribute('data-scene'), 'flow');
+    if (webgl) await page.locator('[data-flow-arena][data-world="3d"]').waitFor();
     await lobby();
     if (process.env.HSK_ARCADE_SCREENSHOTS) {
       await page.locator('.arcade-lobby').screenshot({path: process.env.HSK_ARCADE_SCREENSHOTS + '/hsk1-san-choi.png'});
     }
-    for (const [name, play] of Object.entries({wind, echo, riddle, lights, pinyin, strokes, pairs, flow})) {
+    await enter('pinyin');
+    await movingTarget(page, webgl);
+    await lobby();
+    for (const [name, play] of Object.entries({wind:falling, echo:falling, riddle, lights, pinyin:falling, strokes, pairs, flow})) {
       await enter(name);
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
       assert.equal(await canvas.getAttribute('data-scene'), name);
-      assert.equal(await page.locator(`[data-cinema-cover][data-palette="${name}"]`).count(), 1);
-      assert.equal(await page.locator('#app canvas').count(), 0);
-      if (name === 'pinyin') {
-        if (webgl) await page.locator('#hsk-cinema[data-visual="3d"]').waitFor({state:'attached'});
-        if (process.env.HSK_ARCADE_SCREENSHOTS) {
-          await page.locator('.arcade-main').screenshot({path: process.env.HSK_ARCADE_SCREENSHOTS + '/hsk1-sao-pinyin.png'});
-        }
+      assert.equal(await page.locator('[data-cinema-cover]').count(), 0);
+      await play(page, name);
+      if (process.env.HSK_ARCADE_SCREENSHOTS) {
+        await page.screenshot({path: process.env.HSK_ARCADE_SCREENSHOTS + '/hsk1-' + name + '.png'});
       }
-      if (name === 'lights' && process.env.HSK_ARCADE_SCREENSHOTS) {
-        await page.locator('.arcade-main').screenshot({path: process.env.HSK_ARCADE_SCREENSHOTS + '/hsk1-ho-dom-dom.png'});
-      }
-      await play(page);
-      if (webgl) assert.ok(await canvas.getAttribute('data-cue'), `Thiếu phản hồi 3D cho ${name}`);
       await lobby();
       assert.match(await page.locator(`.arcade-card-${name}`).innerText(), /Kỷ lục \d+/);
     }
     await context.setOffline(true);
     await page.reload();
     await lobby();
-    await enter('pinyin');
-    await page.locator('[data-pinyin-target]').first().waitFor();
-    await lobby();
-    for (const [name, selector] of Object.entries({wind:'[data-wind]', echo:'[data-echo-station]',
-      riddle:'[data-riddle-lock]', lights:'[data-lights-lake]'})) {
+    for (const [name, selector] of Object.entries({
+      wind:'[data-falling-start="calm"]', echo:'[data-falling-start="calm"]',
+      pinyin:'[data-falling-start="calm"]', riddle:'[data-riddle-input]',
+      lights:'[data-lights-calm]', flow:'[data-flow-tile]', strokes:'[data-stroke-start]', pairs:'[data-pairs-card]'
+    })) {
       await enter(name);
-      await page.locator(selector).waitFor();
+      await page.locator(selector).first().waitFor();
+      if (webgl && name === 'flow') await page.locator('[data-flow-arena][data-world="3d"]').waitFor();
       await lobby();
     }
     assert.deepEqual(errors, []);
@@ -321,12 +294,13 @@ async function run() {
     await fallbackPage.getByRole('button', {name:'Sân chơi', exact:true}).click();
     await fallbackPage.locator('[data-action="arcade-start"][data-id="pinyin"]').click();
     await fallbackPage.locator('#hsk-cinema[data-visual="2d"]').waitFor({state:'attached'});
-    const target = fallbackPage.locator('[data-pinyin-target][aria-pressed="true"]');
-    const id = await target.getAttribute('data-pinyin-target');
+    await fallbackPage.locator('[data-falling-start="calm"]').click();
+    const target = currentTarget(fallbackPage);
+    const id = await target.getAttribute('data-word-id');
     const reading = await fallbackPage.evaluate(wordId => window.HSK_ENGINE.W[wordId].pinyin, id);
-    await fallbackPage.locator('[data-pinyin-input]').fill(reading);
-    await fallbackPage.locator('[data-pinyin-launch]').click();
-    await fallbackPage.waitForFunction(() => Number(document.querySelector('[data-pinyin-score]').textContent) > 0);
+    await fallbackPage.locator('[data-falling-entry]').fill(reading);
+    await fallbackPage.locator('[data-falling-entry]').press('Enter');
+    await fallbackPage.waitForFunction(() => Number(document.querySelector('[data-falling-score]').textContent) > 0);
     await fallback.close();
     console.log('Đạt kiểm thử Chromium cho tám trò, hiệu ứng 3D, giảm chuyển động, ngoại tuyến và chạm đôi.');
   } finally {

@@ -2,8 +2,7 @@
   'use strict';
 
   const registry = window.HSK_MINIGAMES ||= {};
-  const LANES = 3;
-  const ROUNDS = 4;
+  const ROUND_COUNT = 4;
 
   function shuffledTiles(tokens) {
     const tiles = tokens.map((text, index) => ({index, text}));
@@ -12,325 +11,295 @@
       [tiles[i], tiles[j]] = [tiles[j], tiles[i]];
     }
     if (tiles.every((tile, index) => tile.text === tokens[index])) {
-      const different = tiles.findIndex(tile => tile.text !== tiles[0].text);
-      [tiles[0], tiles[different]] = [tiles[different], tiles[0]];
+      const other = tiles.findIndex(tile => tile.text !== tiles[0].text);
+      if (other > 0) [tiles[0], tiles[other]] = [tiles[other], tiles[0]];
     }
     return tiles;
   }
 
   registry.flow = function mountFlow(root, ctx) {
-    let rounds = [];
-    let current = 0;
-    let sequence = [];
-    let tiles = [];
-    let start = 0;
-    let stagePoints = 0;
-    let points = 0;
-    let mistakes = 0;
-    let hints = 0;
-    let hintedPosition = -1;
-    let wrongPosition = -1;
-    let delivered = false;
-    let message = '';
-    let header;
-    let banks;
-    let river;
-    let live;
-    let actions;
-
     root.innerHTML = `
-      <section class="memory-game flow-game" data-arcade-mode="flow" aria-label="Dòng Chữ">
-        <p class="memory-game-rule">Vớt các mảnh chữ theo thứ tự để đưa lời nhắn qua sông.</p>
-        <div class="memory-game-score"></div>
-        <div class="flow-message">
-          <span>Lời nhắn cần chuyển</span>
-          <strong></strong>
+      <section class="river-run" aria-label="Dòng Chữ" data-flow-game>
+        <header class="river-run-hud">
+          <span><i aria-hidden="true">◇</i> Nhịp <b data-flow-round></b></span>
+          <span><b data-flow-score>0</b> điểm</span>
+        </header>
+        <div class="river-run-arena" data-flow-arena>
+          <div class="river-run-landscape" aria-hidden="true"></div>
+          <canvas class="river-run-world" data-flow-world aria-hidden="true"></canvas>
+          <div class="river-run-talk">
+            <span>Ghép câu để bắc cầu</span>
+            <strong data-flow-clue></strong>
+          </div>
+          <div class="river-run-channel" aria-hidden="true"><i></i><b></b></div>
+          <span class="river-run-fox" aria-hidden="true">🦊</span>
+          <div class="river-run-span" role="group" aria-label="Mảnh cầu theo thứ tự từ trái sang phải"></div>
+          <div class="river-run-deck" role="group" aria-label="Các mảnh chữ để bắc cầu"></div>
         </div>
-        <div class="flow-banks">
-          <div class="flow-bridge" role="group" aria-label="Thứ tự các mảnh trên cầu"></div>
-        </div>
-        <div class="flow-river" data-cinema-stage role="group" aria-label="Các thuyền chở mảnh chữ">
-          <div class="flow-current-water" aria-hidden="true"></div>
-          <div class="flow-islet flow-islet--one" aria-hidden="true"><i></i></div>
-          <div class="flow-islet flow-islet--two" aria-hidden="true"><i></i></div>
-          <div class="flow-skiff" aria-hidden="true"><i></i><b></b></div>
-          <div class="flow-tile-grid"></div>
-        </div>
-        <p class="memory-game-status" role="status" aria-live="polite"></p>
-        <div class="memory-game-actions flow-controls"></div>
+        <p class="river-run-status" data-flow-status role="status" aria-live="polite"></p>
+        <footer class="river-run-controls">
+          <button type="button" class="river-run-button" data-flow-hint>Gợi ý</button>
+          <button type="button" class="river-run-button river-run-primary" data-flow-send>Qua cầu</button>
+          <button type="button" class="river-run-button river-run-primary" data-flow-repair hidden>Sửa từ nhịp sai</button>
+          <button type="button" class="river-run-button river-run-primary" data-flow-next hidden>Đến bờ tiếp theo</button>
+          <button type="button" class="river-run-button river-run-primary" data-flow-replay hidden>Chơi lại</button>
+        </footer>
       </section>`;
 
-    header = root.querySelector('.memory-game-score');
-    const game = root.querySelector('.flow-game');
-    const reducedMotion = ctx.lowMotion || matchMedia('(prefers-reduced-motion: reduce)').matches;
-    banks = root.querySelector('.flow-bridge');
-    river = root.querySelector('.flow-river');
-    live = root.querySelector('.memory-game-status');
-    actions = root.querySelector('.flow-controls');
+    const game = root.firstElementChild;
+    const arena = root.querySelector('[data-flow-arena]');
+    const canvas = root.querySelector('[data-flow-world]');
+    const spans = root.querySelector('.river-run-span');
+    const deck = root.querySelector('.river-run-deck');
+    const status = root.querySelector('[data-flow-status]');
+    const hintButton = root.querySelector('[data-flow-hint]');
+    const sendButton = root.querySelector('[data-flow-send]');
+    const repairButton = root.querySelector('[data-flow-repair]');
+    const nextButton = root.querySelector('[data-flow-next]');
+    const replayButton = root.querySelector('[data-flow-replay]');
+    const media = matchMedia('(prefers-reduced-motion: reduce)');
+    const still = () => ctx.lowMotion || media.matches;
+    const controller = new AbortController();
+    const options = {signal:controller.signal};
+    let world;
+    let crossingTimer;
+    let rounds = [];
+    let round = 0;
+    let score = 0;
+    let sequence = [];
+    let tiles = [];
+    let mistakes = 0;
+    let hinted = new Set();
+    let highlight = -1;
+    let wrong = -1;
+    let phase = 'building';
+
+    const sentence = () => rounds[round];
+    const announce = text => { status.textContent = text; };
+    const focus = element => element?.focus({preventScroll:true});
+
+    function makeButton(text, kind, index, extra = {}) {
+      const node = document.createElement('button');
+      node.type = 'button';
+      node.className = 'river-run-' + kind;
+      node.dataset[kind === 'slot' ? 'flowSlot' : 'flowTile'] = index;
+      node.lang = 'zh-Hans';
+      node.textContent = text;
+      node.disabled = Boolean(extra.disabled);
+      node.setAttribute('aria-label', extra.label);
+      return node;
+    }
+
+    function snapshot() {
+      return {slots:[...spans.children], tiles:[...deck.children], sequence,
+        wrong, phase, highlight, answer:sentence()?.tokens[highlight]};
+    }
+
+    function renderControls() {
+      game.dataset.phase = phase;
+      root.querySelector('[data-flow-round]').textContent = rounds.length ? `${round + 1}/${rounds.length}` : '0/0';
+      root.querySelector('[data-flow-score]').textContent = score;
+      hintButton.hidden = sendButton.hidden = phase !== 'building';
+      hintButton.disabled = !sentence() || sequence.length === tiles.length;
+      sendButton.disabled = !sentence() || sequence.length !== tiles.length;
+      repairButton.hidden = phase !== 'wrong';
+      nextButton.hidden = phase !== 'landed' || round + 1 >= rounds.length;
+      replayButton.hidden = phase !== 'landed' || round + 1 < rounds.length;
+    }
+
+    function paint() {
+      for (const [index, slot] of Array.from(spans.children).entries()) {
+        const tile = sequence[index];
+        slot.textContent = tile?.text || '·';
+        slot.disabled = !tile || phase !== 'building';
+        slot.setAttribute('aria-label', tile ? `Gỡ mảnh ${tile.text} ở vị trí ${index + 1}` : `Nhịp trống ${index + 1}`);
+        slot.toggleAttribute('data-filled', Boolean(tile));
+        slot.toggleAttribute('data-next', !tile && phase === 'building' && index === sequence.length);
+        slot.toggleAttribute('data-wrong', wrong === index);
+        slot.toggleAttribute('data-lit', phase === 'crossing' || phase === 'landed');
+      }
+      for (const button of deck.children) {
+        const tile = tiles.find(item => item.index === Number(button.dataset.flowTile));
+        const selected = sequence.includes(tile);
+        button.disabled = selected || phase !== 'building';
+        button.classList.toggle('is-used', selected);
+        button.classList.toggle('is-hinted', !selected && tile.text === sentence()?.tokens[highlight]);
+      }
+      renderControls();
+      world?.sync(snapshot());
+    }
+
+    function showRound() {
+      clearTimeout(crossingTimer);
+      const current = sentence();
+      sequence = [];
+      tiles = current ? shuffledTiles(current.tokens) : [];
+      mistakes = 0;
+      hinted = new Set();
+      highlight = wrong = -1;
+      phase = 'building';
+      arena.style.setProperty('--river-count', tiles.length || 2);
+      arena.toggleAttribute('data-crowded', tiles.length > 4);
+      root.querySelector('[data-flow-clue]').textContent = current?.vi || 'Chưa có câu phù hợp.';
+      spans.replaceChildren(...tiles.map((_, index) => makeButton('·', 'slot', index, {label:`Nhịp trống ${index + 1}`})));
+      deck.replaceChildren(...tiles.map(tile => makeButton(tile.text, 'tile', tile.index, {label:`Lắp mảnh ${tile.text}`})));
+      Array.from(deck.children).forEach((button, index) => button.setAttribute('aria-keyshortcuts', String(index + 1)));
+      world?.reset();
+      paint();
+      announce(current ? 'Chọn mảnh chữ theo thứ tự của câu. Chạm mảnh đã lắp để gỡ.' : 'Hãy học thêm từ và quay lại.');
+    }
 
     function newRun() {
-      rounds = ctx.sentences(ROUNDS * 4).filter(sentence =>
-        sentence.tokens.length >= 2 && sentence.tokens.length <= 7 && new Set(sentence.tokens).size > 1
-      ).slice(0, ROUNDS);
-      points = 0;
-      newRound(0);
+      rounds = ctx.sentences(ROUND_COUNT * 4).filter(current => current.tokens.length >= 2 &&
+        current.tokens.length <= 7 && new Set(current.tokens).size > 1).slice(0, ROUND_COUNT);
+      score = round = 0;
+      showRound();
     }
 
-    function newRound(index) {
-      current = index;
-      const sentence = rounds[current];
-      sequence = [];
-      start = 0;
-      tiles = sentence ? shuffledTiles(sentence.tokens) : [];
-      stagePoints = 0;
-      mistakes = 0;
-      hints = 0;
-      hintedPosition = -1;
-      wrongPosition = -1;
-      delivered = false;
-      game.classList.remove('is-delivered');
-      river.classList.remove('is-cycling');
-      message = sentence ? 'Chạm một thuyền để đưa mảnh chữ vào cầu.' : 'Chưa có lời nhắn phù hợp. Hãy chơi lại sau khi học thêm.';
-      update();
+    function transfer(text, before, destination) {
+      if (still() || !before.width) return;
+      const outside = arena.getBoundingClientRect();
+      const after = destination.getBoundingClientRect();
+      const dx = after.left + (after.width - before.width) / 2 - before.left;
+      const dy = after.top + (after.height - before.height) / 2 - before.top;
+      if (!Element.prototype.animate) return;
+      const label = document.createElement('span');
+      label.setAttribute('aria-hidden', 'true');
+      label.className = 'river-run-flight';
+      label.lang = 'zh-Hans';
+      label.textContent = text;
+      label.style.cssText = `left:${before.left - outside.left}px;top:${before.top - outside.top}px;width:${before.width}px;height:${before.height}px`;
+      arena.append(label);
+      label.animate([
+        {transform:'translate(0,0) rotate(-3deg)', opacity:1},
+        {transform:`translate(${dx * .49}px,${dy * .52 - 24}px) rotate(10deg) scale(1.12)`, offset:.52, opacity:1},
+        {transform:`translate(${dx}px,${dy}px) rotate(0) scale(.83)`, opacity:.08},
+      ], {duration:425, easing:'cubic-bezier(.21,.65,.32,1)'}).finished.then(() => label.remove(), () => label.remove());
     }
 
-    function button(text, attribute, option = {}) {
-      const element = document.createElement('button');
-      element.type = 'button';
-      element.className = option.className || 'btn button-soft';
-      element.textContent = text;
-      element.setAttribute(attribute, option.value ?? '');
-      element.disabled = option.disabled === true;
-      return element;
-    }
-
-    function update() {
-      const sentence = rounds[current];
-      root.querySelector('.flow-message strong').textContent = sentence?.vi || '';
-      header.innerHTML = `<span><b>${sentence ? current + 1 : 0}/${rounds.length}</b> chuyến</span><span><b>${points}</b> điểm</span>`;
-      river.classList.toggle('is-delivered', delivered);
-      game.classList.toggle('is-delivered', delivered);
-      game.classList.toggle('has-error', wrongPosition >= 0);
-      game.classList.toggle('has-cargo', sequence.length > 0);
-
-      banks.replaceChildren();
-      if (sentence) {
-        for (let i = 0; i < sentence.tokens.length; i++) {
-          const tile = sequence[i];
-          const slot = button(tile?.text || '·', 'data-flow-slot', {
-            className: 'flow-slot', value: i, disabled: !tile || delivered || wrongPosition >= 0,
-          });
-          slot.classList.toggle('is-filled', Boolean(tile));
-          slot.classList.toggle('is-wrong', i === wrongPosition);
-          slot.classList.toggle('is-next', !tile && !delivered && i === sequence.length);
-          if (tile) slot.lang = 'zh-Hans';
-          slot.setAttribute('aria-label', tile ? `Gỡ mảnh ${tile.text} ở vị trí ${i+1}` : `Vị trí trống ${i+1}`);
-          banks.append(slot);
-        }
-      }
-
-      const available = remainingTiles();
-      const visible = [...available.slice(start), ...available.slice(0, start)].slice(0, LANES);
-      const grid = river.querySelector('.flow-tile-grid');
-      grid.replaceChildren();
-      for (const tile of visible) {
-        const boat = button(tile.text, 'data-flow-tile', {
-          className: 'flow-tile', value: tile.index, disabled: delivered || wrongPosition >= 0,
-        });
-        boat.lang = 'zh-Hans';
-        boat.setAttribute('aria-label', `Vớt mảnh ${tile.text}`);
-        const cargo = document.createElement('span');
-        cargo.className = 'flow-boat-cargo';
-        cargo.textContent = tile.text;
-        boat.replaceChildren(cargo);
-        if (hintedPosition >= 0 && sentence.tokens[hintedPosition] === tile.text) boat.classList.add('is-hinted');
-        grid.append(boat);
-      }
-      const final = delivered && current + 1 === rounds.length;
-      const status = delivered
-        ? `${sentence.hanzi} · ${sentence.pinyin}. ${final ? `Đã chuyển hết lời nhắn. Tổng ${points} điểm.` : `Đã qua sông. +${stagePoints} điểm.`}`
-        : message;
-      live.textContent = status;
-      actions.replaceChildren();
-      if (!sentence) return;
-      if (final) {
-        actions.append(button('Vượt sông lần nữa', 'data-flow-replay', {className:'btn primary'}));
-      } else if (delivered) {
-        actions.append(button('Chuyến tiếp theo', 'data-flow-next', {className:'btn primary'}));
-      } else if (wrongPosition >= 0) {
-        actions.append(button('Sửa từ nhịp này', 'data-flow-repair', {className:'btn primary'}));
-      } else {
-        actions.append(button('Đổi dòng', 'data-flow-cycle', {disabled:available.length <= LANES}));
-        actions.append(button('Gợi ý', 'data-flow-hint', {disabled:sequence.length === sentence.tokens.length}));
-        actions.append(button('Đưa thuyền qua', 'data-flow-send', {
-          className:'btn primary', disabled:sequence.length !== sentence.tokens.length,
-        }));
-      }
-    }
-
-    function remainingTiles() {
-      return tiles.filter(tile => !sequence.includes(tile));
-    }
-
-    function selectTile(boat) {
-      if (delivered || wrongPosition >= 0) return;
-      const id = Number(boat.dataset.flowTile);
-      const tile = remainingTiles().find(item => item.index === id);
-      if (!tile) return;
-      const bounds = boat.querySelector('.flow-boat-cargo').getBoundingClientRect();
-      const from = {x: (bounds.left + bounds.width / 2) / window.innerWidth,
-        y: (bounds.top + bounds.height / 2) / window.innerHeight};
+    function choose(button) {
+      if (phase !== 'building') return;
+      const tile = tiles.find(item => item.index === Number(button.dataset.flowTile));
+      if (!tile || sequence.includes(tile)) return;
+      const before = button.getBoundingClientRect();
+      const slot = sequence.length;
       sequence.push(tile);
-      const left = remainingTiles().length;
-      start = left ? start % left : 0;
-      message = left ? `Đã vớt ${tile.text}.` : 'Cầu đã đủ mảnh. Đưa thuyền qua để kiểm tra thứ tự.';
-      update();
-      const slot = banks.children[sequence.length - 1];
-      transfer(tile.text, bounds, slot);
-      ctx.motion?.('boat', slot, {from, index:sequence.length - 1, progress:sequence.length / rounds[current].tokens.length});
-      focus(left ? '.flow-tile-grid button' : '[data-flow-send]');
+      highlight = -1;
+      paint();
+      if (!world?.place(slot, button, still())) transfer(tile.text, before, spans.children[slot]);
+      announce(sequence.length === tiles.length ? 'Cầu đã đủ nhịp. Đưa Cáo Đèn qua.' : `Đã lắp mảnh ${tile.text}.`);
+      focus([...deck.children].find(item => !item.disabled) || sendButton);
     }
 
-    function transfer(text, from, slot) {
-      if (reducedMotion || typeof game.animate !== 'function') return;
-      const stage = game.getBoundingClientRect();
-      const to = slot.getBoundingClientRect();
-      const dx = to.left + (to.width - from.width) / 2 - from.left;
-      const dy = to.top + (to.height - from.height) / 2 - from.top;
-      const cargo = document.createElement('span');
-      cargo.className = 'flow-boat-cargo flow-cargo-flying';
-      cargo.lang = 'zh-Hans';
-      cargo.textContent = text;
-      cargo.setAttribute('aria-hidden', 'true');
-      Object.assign(cargo.style, {left: `${from.left - stage.left}px`, top: `${from.top - stage.top}px`,
-        width: `${from.width}px`, height: `${from.height}px`});
-      game.append(cargo);
-      cargo.animate([
-        {transform:'translate(0, 0) rotate(-4deg)', opacity:1},
-        {transform:`translate(${dx * .5}px, ${dy * .5 - 26}px) rotate(12deg) scale(1.12)`, opacity:1, offset:.5},
-        {transform:`translate(${dx}px, ${dy}px) rotate(0) scale(.82)`, opacity:0},
-      ], {duration:490, easing:'cubic-bezier(.23,.71,.25,.98)'}).finished.then(() => cargo.remove(), () => cargo.remove());
-      slot.animate([
-        {filter:'brightness(.65)'},
-        {filter:'brightness(1.32)', offset:.8},
-        {filter:'brightness(1)'},
-      ], {duration:550, easing:'ease-out'});
-    }
-
-    function removeTile(index) {
-      if (delivered || wrongPosition >= 0 || !sequence[index]) return;
-      sequence.splice(index, 1);
-      message = 'Mảnh đã trở lại dòng nước.';
-      update();
-      ctx.motion?.('select', river);
-      focus('[data-flow-tile]');
-    }
-
-    function cycle() {
-      const available = remainingTiles().length;
-      if (available <= LANES || delivered || wrongPosition >= 0) return;
-      start = (start + LANES) % available;
-      river.classList.remove('is-cycling');
-      void river.offsetWidth;
-      river.classList.add('is-cycling');
-      message = 'Một nhóm thuyền khác đã trôi đến.';
-      update();
-      ctx.motion?.('drift', river);
-      focus('[data-flow-cycle]');
+    function remove(index) {
+      if (phase !== 'building' || !sequence[index]) return;
+      const [tile] = sequence.splice(index, 1);
+      highlight = -1;
+      paint();
+      announce(`Đã gỡ mảnh ${tile.text}.`);
+      focus(deck.querySelector(`[data-flow-tile="${tile.index}"]`));
     }
 
     function hint() {
-      const sentence = rounds[current];
-      if (delivered || wrongPosition >= 0 || sequence.length >= sentence.tokens.length) return;
-      const mismatch = sequence.findIndex((tile, index) => tile.text !== sentence.tokens[index]);
-      const index = mismatch >= 0 ? mismatch : sequence.length;
-      if (hintedPosition !== index) {
-        hintedPosition = index;
-        hints++;
-      }
-      message = `Mảnh ở vị trí ${index + 1} là ${sentence.tokens[index]}.`;
-      live.textContent = message;
-      [...river.querySelectorAll('.flow-boat-cargo')].forEach(cargo => {
-        cargo.parentElement.classList.toggle('is-hinted', cargo.textContent === sentence.tokens[index]);
-      });
-      ctx.motion?.('hint', banks.children[index]);
+      if (phase !== 'building' || !sentence() || sequence.length === tiles.length) return;
+      const mismatch = sequence.findIndex((tile, index) => tile.text !== sentence().tokens[index]);
+      highlight = mismatch >= 0 ? mismatch : sequence.length;
+      hinted.add(highlight);
+      paint();
+      announce(`Mảnh ở vị trí ${highlight + 1} là ${sentence().tokens[highlight]}.`);
     }
 
-    function send() {
-      const sentence = rounds[current];
-      if (!sentence || delivered || wrongPosition >= 0 || sequence.length !== sentence.tokens.length) return;
-      wrongPosition = sequence.findIndex((tile, index) => tile.text !== sentence.tokens[index]);
-      if (wrongPosition >= 0) {
+    function finishCrossing() {
+      if (phase !== 'crossing') return;
+      clearTimeout(crossingTimer);
+      phase = 'landed';
+      paint();
+      const final = round === rounds.length - 1;
+      const reading = sentence().pinyin;
+      const stop = /[.!?。？！]$/.test(reading) ? '' : '.';
+      announce(`${sentence().hanzi} · ${reading}${stop} ${final ? `Đã qua cả ${rounds.length} cầu. Tổng ${score} điểm.` : 'Cáo Đèn đã sang bờ.'}`);
+      focus(final ? replayButton : nextButton);
+    }
+
+    function cross() {
+      if (phase !== 'building' || !sentence() || sequence.length !== tiles.length) return;
+      wrong = sequence.findIndex((tile, index) => tile.text !== sentence().tokens[index]);
+      if (wrong >= 0) {
         mistakes++;
-        message = `Thuyền dừng ở mảnh thứ ${wrongPosition + 1}. Giữ lại đoạn đúng và thử tiếp.`;
-        update();
-        ctx.motion?.('miss', banks.children[wrongPosition]);
-        focus('[data-flow-repair]');
+        phase = 'wrong';
+        paint();
+        announce(`Cáo Đèn dừng ở nhịp ${wrong + 1}. Đoạn cầu đúng được giữ nguyên.`);
+        focus(repairButton);
         return;
       }
-      delivered = true;
-      stagePoints = Math.max(30, 120 - 20 * mistakes - 15 * hints) + 20 * sentence.tokens.length;
-      points += stagePoints;
-      const quality = hints || mistakes ? 'almost' : 'good';
-      for (const id of new Set(sentence.wordIds)) ctx.grade(id, 'usage', quality);
-      update();
-      ctx.motion?.('sail', river, {fromX:.2, fromY:.86, toX:.79, toY:.19, progress:1, count:sequence.length, index:current});
-      const final = current + 1 === rounds.length;
-      focus(final ? '[data-flow-replay]' : '[data-flow-next]');
-      if (final) {
-        ctx.motion?.('reward', banks);
-        ctx.complete(points);
+      phase = 'crossing';
+      score += Math.max(35, 120 + tiles.length * 20 - mistakes * 20 - hinted.size * 15);
+      const quality = mistakes || hinted.size ? 'almost' : 'good';
+      for (const id of new Set(sentence().wordIds)) ctx.grade(id, 'usage', quality);
+      if (round === rounds.length - 1) ctx.complete(score);
+      paint();
+      if (still()) finishCrossing();
+      else {
+        announce('Cầu đã sáng. Cáo Đèn đang qua sông.');
+        crossingTimer = setTimeout(finishCrossing, 1870);
       }
     }
 
     function repair() {
-      if (wrongPosition < 0) return;
-      sequence.splice(wrongPosition);
-      wrongPosition = -1;
-      start = 0;
-      message = 'Phần đầu đã đúng. Tìm các mảnh để nối nhịp cầu còn lại.';
-      update();
-      focus('[data-flow-tile]');
+      if (phase !== 'wrong') return;
+      sequence.splice(wrong);
+      phase = 'building';
+      wrong = highlight = -1;
+      paint();
+      announce('Hãy lắp tiếp từ nhịp còn trống.');
+      focus([...deck.children].find(item => !item.disabled));
     }
 
-    function focus(selector) {
-      root.querySelector(selector)?.focus({preventScroll:true});
-    }
-
-    function onClick(event) {
-      const target = event.target.closest('button');
-      if (!target || target.disabled) return;
-      if (target.hasAttribute('data-flow-tile')) selectTile(target);
-      if (target.hasAttribute('data-flow-slot')) removeTile(Number(target.dataset.flowSlot));
-      if (target.hasAttribute('data-flow-cycle')) cycle();
-      if (target.hasAttribute('data-flow-hint')) hint();
-      if (target.hasAttribute('data-flow-send')) send();
-      if (target.hasAttribute('data-flow-repair')) repair();
-      if (target.hasAttribute('data-flow-next')) {
-        newRound(current + 1);
-        focus('[data-flow-tile]');
-      }
-      if (target.hasAttribute('data-flow-replay')) {
+    game.addEventListener('click', event => {
+      const button = event.target.closest('button');
+      if (!button || button.disabled) return;
+      if (button.hasAttribute('data-flow-tile')) choose(button);
+      else if (button.hasAttribute('data-flow-slot')) remove(Number(button.dataset.flowSlot));
+      else if (button === hintButton) hint();
+      else if (button === sendButton) cross();
+      else if (button === repairButton) repair();
+      else if (button === nextButton && phase === 'landed') {
+        round++;
+        showRound();
+        focus(deck.firstElementChild);
+      } else if (button === replayButton && phase === 'landed') {
         newRun();
-        focus('[data-flow-tile]');
+        focus(deck.firstElementChild);
       }
-    }
+    }, options);
 
-    function onKeyDown(event) {
-      const tile = event.target.closest('[data-flow-tile]');
-      if (!tile || !['ArrowLeft','ArrowRight'].includes(event.key)) return;
+    game.addEventListener('keydown', event => {
+      if (event.altKey || event.ctrlKey || event.metaKey || phase !== 'building') return;
+      const index = Number(event.key) - 1;
+      const button = deck.children[index];
+      if (index < 0 || !button || button.disabled) return;
       event.preventDefault();
-      const adjacent = event.key === 'ArrowLeft' ? tile.previousElementSibling : tile.nextElementSibling;
-      if (adjacent) adjacent.focus();
-      else cycle();
-    }
+      choose(button);
+    }, options);
 
-    root.addEventListener('click', onClick);
-    root.addEventListener('keydown', onKeyDown);
+    media.addEventListener?.('change', () => {
+      world?.setReduced(still());
+      if (still() && phase === 'crossing') finishCrossing();
+    }, options);
     newRun();
+
+    const module = new URL('./arcade/bridge-world.js', document.baseURI);
+    import(module.href).then(({buildBridgeWorld}) => {
+      if (controller.signal.aborted || !canvas.isConnected) return;
+      world = buildBridgeWorld(canvas, {reduced:still()});
+      world?.sync(snapshot());
+    }).catch(() => {
+      // The complete puzzle stays playable using the CSS river and planks.
+    });
     return () => {
-      root.removeEventListener('click', onClick);
-      root.removeEventListener('keydown', onKeyDown);
+      controller.abort();
+      clearTimeout(crossingTimer);
+      world?.dispose();
     };
   };
 })();

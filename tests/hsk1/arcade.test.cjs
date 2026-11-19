@@ -8,8 +8,8 @@ const { appRoot, loadGame } = require('./helpers.cjs');
 function loadArcadeParts() {
   const window = {};
   const context = vm.createContext({ window });
-  for (const file of ['catalog.js', 'strokes-data.js', 'pinyin.js', 'strokes.js', 'pairs.js', 'flow.js',
-    'wind.js', 'echo.js', 'riddle.js', 'lights.js']) {
+  for (const file of ['catalog.js', 'strokes-data.js', 'falling.js', 'strokes.js', 'pairs.js', 'flow.js',
+    'riddle.js', 'lights.js']) {
     vm.runInContext(readFileSync(path.join(appRoot, 'arcade', file), 'utf8'), context, { filename: file });
   }
   return window;

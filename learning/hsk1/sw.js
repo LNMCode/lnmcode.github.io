@@ -1,18 +1,17 @@
 const SCOPE = self.registration.scope;
 const CACHE_PREFIX = `han-ngu-hsk1:${SCOPE}:`;
-const VERSION = 'local-v11'; // Replaced with the commit SHA in the Pages artifact.
+const VERSION = 'local-v12'; // Replaced with the commit SHA in the Pages artifact.
 const CACHE = CACHE_PREFIX + VERSION;
 const APP_SHELL = new URL('index.html', SCOPE).href;
 const CORE = new Set([
   'index.html', 'styles.css', 'boot.js', 'data.js', 'engine.js', 'app.js',
   'manifest.webmanifest', 'icon-192.png', 'icon-512.png',
   'art/school.webp', 'art/market.webp', 'art/river.webp',
-  'arcade/arcade.css', 'arcade/pinyin.css', 'arcade/strokes.css', 'arcade/memory-games.css',
-  'arcade/catalog.js', 'arcade/visual.js', 'arcade/strokes-data.js', 'arcade/pinyin.js',
-  'arcade/cinema.css', 'arcade/cinema-scenes.js', 'arcade/story-world.js', 'arcade/game-sets.js',
-  'arcade/strokes.js', 'arcade/pairs.js', 'arcade/flow.js',
-  'arcade/wind.js', 'arcade/echo.js', 'arcade/riddle.js', 'arcade/lights.js',
-  'arcade/wind.css', 'arcade/echo.css', 'arcade/riddle.css', 'arcade/lights.css',
+  'arcade/arcade.css', 'arcade/falling.css', 'arcade/strokes.css', 'arcade/memory-games.css',
+  'arcade/catalog.js', 'arcade/visual.js', 'arcade/strokes-data.js', 'arcade/falling.js',
+  'arcade/cinema.css', 'arcade/cinema-scenes.js', 'arcade/story-world.js', 'arcade/arena-models.js',
+  'arcade/strokes.js', 'arcade/pairs.js', 'arcade/flow.js', 'arcade/bridge-world.js', 'arcade/flow-arena.css',
+  'arcade/riddle.js', 'arcade/lights.js', 'arcade/riddle.css', 'arcade/lights.css',
   'arcade/ARPHICPL.TXT', 'arcade/vendor/THREE-LICENSE.txt',
   'arcade/vendor/three.module.min.js', 'arcade/vendor/three.core.min.js'
 ].map(path => new URL(path, SCOPE).href));

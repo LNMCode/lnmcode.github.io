@@ -3,282 +3,286 @@
 
   const registry = window.HSK_MINIGAMES ||= {};
   const ROUND_COUNT = 5;
-  const PARTS = ['onset', 'rime', 'tone'];
-  const PART_LABELS = {onset:'Phần đầu', rime:'Phần vần', tone:'Thanh điệu'};
-  const EMPTY_ONSET = '∅';
-  const TONES = ['', '\u0304', '\u0301', '\u030c', '\u0300'];
-  const TONE_LABEL = ['','1 · ngang','2 · lên','3 · xuống lên','4 · xuống','5 · nhẹ'];
-  const COMMON_ONSETS = ['b', 'p', 'd', 't', 'n', 'l', 'g', 'k', 'h', 'j', 'q', 'x', 'zh', 'ch', 'sh', 'r', 'z', 'c', 's', 'y', 'w', EMPTY_ONSET];
-  const COMMON_RIMES = ['a', 'ai', 'an', 'ang', 'ao', 'e', 'ei', 'en', 'eng', 'i', 'in', 'ing', 'iu', 'o', 'ong', 'ou', 'u', 'un', 'uo', 'ü', 'üe'];
-  const SIMILAR = ['z zh', 'c ch', 's sh', 'l n', 'b p', 'j q x', 'an ang', 'en eng', 'in ing', 'u ü', 'ai ei', 'ao ou']
-    .map(group => group.split(' '));
+  const ATTEMPTS = 6;
+  const keys = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
+  const TONES = ['\u0304', '\u0301', '\u030c', '\u0300'];
+  const labels = {exact:'đúng chỗ', nearby:'khác chỗ', absent:'không có'};
+  const rank = {absent:1, nearby:2, exact:3};
+  const escape = value => String(value ?? '').replace(/[&<>"']/g,
+    mark => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[mark]));
+  const display = letter => letter === 'v' ? 'ü' : letter;
 
-  function readParts(word) {
-    // Compare spellings, with y and w treated as written first letters.
-    if ([...word.hanzi].length !== 1 || word.pinyinAlternatives?.length) return null;
-    const marked = word.pinyin.toLowerCase().normalize('NFD');
-    const base = marked.replace(/[\u0304\u0301\u030c\u0300]/g, '').normalize('NFC');
-    const match = base.match(/^(zh|ch|sh|[bpmfdtnlgkhjqxrzcsyw])?([aeiouüê][a-züê]*)$/);
-    if (!match) return null;
-    const tone = TONES.findIndex((mark, index) => index > 0 && marked.includes(mark));
-    return {word, onset: match[1] || EMPTY_ONSET, rime: match[2], tone: String(tone < 0 ? 5 : tone)};
+  function reading(value) {
+    const raw = String(value).toLowerCase().trim().replace(/u:/g, 'ü').normalize('NFD');
+    const toneDigit = raw.match(/[1-5]$/)?.[0];
+    const markedTone = TONES.findIndex(mark => raw.includes(mark)) + 1;
+    const letters = raw.replace(/u\u0308/g, 'v').replace(/[\u0300-\u036f]/g, '').replace(/[1-5]$/, '');
+    return {letters, tone: Number(toneDigit) || markedTone || 0};
   }
 
-  function shuffle(values) {
-    const copy = [...values];
-    for (let index = copy.length - 1; index > 0; index--) {
-      const chosen = Math.floor(Math.random() * (index + 1));
-      [copy[index], copy[chosen]] = [copy[chosen], copy[index]];
+  function classify(guess, answer) {
+    const remaining = [...answer];
+    const marks = [...guess].map((letter, index) => {
+      if (letter !== answer[index]) return 'absent';
+      remaining[index] = null;
+      return 'exact';
+    });
+    for (let index = 0; index < marks.length; index++) {
+      if (marks[index] === 'exact') continue;
+      const match = remaining.indexOf(guess[index]);
+      if (match === -1) continue;
+      marks[index] = 'nearby';
+      remaining[match] = null;
     }
-    return copy;
+    return marks;
   }
 
-  function optionsFor(correct, inventory) {
-    const close = SIMILAR.find(group => group.includes(correct)) || [];
-    const candidates = [...new Set([correct, ...close, ...shuffle(inventory)])];
-    return shuffle(candidates.slice(0, 4));
-  }
-
-  function choiceLabel(part, value) {
-    if (value === EMPTY_ONSET) return 'Không có';
-    return part === 'tone' ? TONE_LABEL[Number(value)] : value;
+  function uniquePuzzles(words) {
+    const byMeaning = new Map();
+    for (const word of words) byMeaning.set(word.vi, (byMeaning.get(word.vi) || 0) + 1);
+    return words.flatMap(word => {
+      const {letters} = reading(word.pinyin);
+      if (byMeaning.get(word.vi) !== 1 || !/^[a-z]{2,6}$/.test(letters) || [...word.hanzi].length !== 1) return [];
+      if ((word.pinyinAlternatives || []).some(value => reading(value).letters !== letters)) return [];
+      return [{word, answer:letters}];
+    });
   }
 
   registry.riddle = function mountRiddle(root, ctx) {
     root.innerHTML = `
-      <section class="riddle-game${ctx.lowMotion ? ' riddle-still' : ''}" data-riddle-riddle aria-label="Mật Mã Âm Tiết">
-        <div class="riddle-hud"><span>Khóa <b data-riddle-round></b></span><span><b data-riddle-score>0</b> điểm</span></div>
-        <div class="riddle-vault" data-riddle-lock data-cinema-stage>
-          <div class="riddle-shutters" aria-hidden="true"><i></i><i></i></div>
-          <div class="riddle-plate">
-            <div class="riddle-ring riddle-ring-outer" aria-hidden="true"></div>
-            <div class="riddle-ring riddle-ring-middle" aria-hidden="true"></div>
-            <div class="riddle-ring riddle-ring-inner" aria-hidden="true"></div>
-            <div class="riddle-seal" data-riddle-word lang="zh-Hans"></div>
-          </div>
-          <b class="riddle-gain" aria-hidden="true"></b>
-          <ol class="riddle-lamps" aria-label="Dấu niêm đã mở"></ol>
+      <section class="riddle-chamber${ctx.lowMotion ? ' riddle-still' : ''}" data-riddle-riddle aria-label="Mật Mã Âm Tiết">
+        <div class="riddle-hud">
+          <span>Ấn <b data-riddle-round></b></span><span><b data-riddle-score>0</b> điểm</span>
         </div>
-        <div class="riddle-clue"><small>Nghĩa của chữ</small><strong data-riddle-meaning></strong></div>
-        <form class="riddle-form" data-riddle-form>
-          <p>Chọn phần đầu, phần vần và thanh điệu theo cách viết Pinyin.</p>
-          <div class="riddle-dials">
-            ${PARTS.map(part => `<div class="riddle-dial" data-riddle-dial="${part}">
-              <label for="riddle-${part}">${PART_LABELS[part]}</label>
-              <select id="riddle-${part}" data-riddle-part="${part}" aria-describedby="riddle-${part}-status"></select>
-              <div class="riddle-dial-turn">
-                <button type="button" data-riddle-turn="-1" aria-label="Lùi một nấc ở ${PART_LABELS[part].toLowerCase()}">‹</button>
-                <button type="button" data-riddle-turn="1" aria-label="Tiến một nấc ở ${PART_LABELS[part].toLowerCase()}">›</button>
-              </div>
-              <span id="riddle-${part}-status" class="riddle-dial-status"></span>
+        <div class="riddle-board" data-riddle-board data-cinema-stage>
+          <div class="riddle-crest" aria-hidden="true"><span>印</span></div>
+          <div class="riddle-tablet">
+            <small>Đoán Pinyin của từ có nghĩa</small><strong data-riddle-meaning></strong>
+            <span class="riddle-letter-count" data-riddle-count></span>
+          </div>
+          <ol class="riddle-grid" data-riddle-grid aria-label="Mã đã thử"></ol>
+          <div class="riddle-legend" aria-label="Chú giải kết quả">
+            <span data-mark="exact">Đúng chỗ</span><span data-mark="nearby">Khác chỗ</span><span data-mark="absent">Không có</span>
+          </div>
+        </div>
+        <div class="riddle-desk">
+          <form class="riddle-form" data-riddle-form>
+            <label class="riddle-entry">
+              <span class="riddle-input-label">Pinyin</span>
+              <input data-riddle-input type="text" name="guess" maxlength="24" inputmode="text" autocomplete="off"
+                autocapitalize="none" spellcheck="false" placeholder="Nhập mã" aria-describedby="riddle-input-help">
+            </label>
+            <button class="riddle-action riddle-submit" type="submit" data-riddle-try>Thử mã</button>
+          </form>
+          <p id="riddle-input-help" class="riddle-help">Dùng <b>v</b> cho <b>ü</b>. Dấu thanh hoặc số thanh là tùy chọn.</p>
+          <div class="riddle-keyboard" aria-label="Bàn phím Pinyin">
+            ${keys.map(row => `<div class="riddle-keyrow">
+              ${[...row].map(key => `<button type="button" class="riddle-key" data-riddle-key="${key}" aria-label="${key === 'v' ? 'V hoặc Ü' : key}">${key}</button>`).join('')}
+              ${row === keys[2] ? '<button type="button" class="riddle-key riddle-backspace" data-riddle-key="Backspace" aria-label="Xóa ký tự cuối">⌫</button>' : ''}
             </div>`).join('')}
           </div>
-          <div class="riddle-buttons">
-            <button type="button" class="btn button-soft" data-riddle-hint>Gợi ý một vòng</button>
-            <button type="submit" class="btn primary" data-riddle-try>Thử mở khóa</button>
+          <button type="button" class="riddle-hint" data-riddle-hint>Gợi ý chữ đầu</button>
+        </div>
+        <p class="riddle-status" data-riddle-status role="status" aria-live="polite"></p>
+        <div class="riddle-result" data-riddle-result hidden>
+          <div class="riddle-result-title"><b data-riddle-word lang="zh-Hans"></b><div><strong data-riddle-reading></strong><p data-riddle-translation></p></div>
+            <button type="button" data-riddle-speak hidden aria-label="Nghe phát âm">♪</button>
           </div>
-        </form>
-        <p class="riddle-message" role="status"></p>
-        <div class="riddle-open-actions" hidden>
-          <button type="button" class="btn primary full" data-riddle-next>Mở khóa tiếp</button>
-          <button type="button" class="btn primary full" data-riddle-replay hidden>Chơi lượt mới</button>
+          <button type="button" class="riddle-action riddle-submit" data-riddle-next hidden>Mở ấn tiếp theo</button>
+          <button type="button" class="riddle-action riddle-submit" data-riddle-replay hidden>Chơi lượt mới</button>
         </div>
       </section>`;
 
     const game = root.firstElementChild;
-    const lock = game.querySelector('[data-riddle-lock]');
-    const form = game.querySelector('[data-riddle-form]');
-    const message = game.querySelector('[role="status"]');
-    const hintButton = game.querySelector('[data-riddle-hint]');
-    const nextButton = game.querySelector('[data-riddle-next]');
-    const replayButton = game.querySelector('[data-riddle-replay]');
-    const reward = game.querySelector('.riddle-open-actions');
-    const gain = game.querySelector('.riddle-gain');
-    const dials = Object.fromEntries(PARTS.map(part => [part, {
-      field: game.querySelector(`[data-riddle-dial="${part}"]`),
-      select: game.querySelector(`[data-riddle-part="${part}"]`),
-      status: game.querySelector(`#riddle-${part}-status`),
-      buttons: [...game.querySelectorAll(`[data-riddle-dial="${part}"] [data-riddle-turn]`)],
-    }]));
-    let rounds = [];
+    const board = root.querySelector('[data-riddle-board]');
+    const grid = root.querySelector('[data-riddle-grid]');
+    const desk = root.querySelector('.riddle-desk');
+    const form = root.querySelector('[data-riddle-form]');
+    const input = root.querySelector('[data-riddle-input]');
+    const result = root.querySelector('[data-riddle-result]');
+    const message = root.querySelector('[data-riddle-status]');
+    const next = root.querySelector('[data-riddle-next]');
+    const replay = root.querySelector('[data-riddle-replay]');
+    const hint = root.querySelector('[data-riddle-hint]');
+    const keyButtons = [...root.querySelectorAll('[data-riddle-key]')].filter(button => button.dataset.riddleKey !== 'Backspace');
+    let puzzles = [];
     let index = 0;
     let score = 0;
-    let mistakes = 0;
-    let hints = 0;
-    let opened = false;
+    let history = [];
+    let closed = false;
+    let assisted = false;
+    let composition = false;
 
-    function updateScore() {
-      game.querySelector('[data-riddle-round]').textContent = `${Math.min(index + 1, rounds.length)}/${rounds.length}`;
-      game.querySelector('[data-riddle-score]').textContent = score;
-      const lit = index + Number(opened);
-      game.querySelector('.riddle-lamps').replaceChildren(...rounds.map((_, slot) => {
-        const lamp = document.createElement('li');
-        lamp.className = slot < lit ? 'is-lit' : '';
-        lamp.setAttribute('aria-label', `Khóa ${slot + 1} ${slot < lit ? 'đã mở' : 'còn đóng'}`);
-        return lamp;
-      }));
+    const current = () => puzzles[index];
+    const announce = text => { message.textContent = text; };
+    const updateScore = () => {
+      root.querySelector('[data-riddle-score]').textContent = score;
+      root.querySelector('[data-riddle-round]').textContent = `${index + 1}/${puzzles.length}`;
+    };
+
+    function paintRows(animate = -1) {
+      const {answer} = current();
+      const preview = closed ? '' : reading(input.value).letters.replace(/[^a-z]/g, '').slice(0, answer.length);
+      grid.style.setProperty('--riddle-length', answer.length);
+      grid.innerHTML = Array.from({length:ATTEMPTS}, (_, row) => {
+        const guess = history[row];
+        const active = !closed && row === history.length;
+        const letters = guess?.letters ?? (active ? preview : '');
+        const description = guess ? `Lượt ${row + 1}, ${[...letters].map((letter, column) =>
+          `${display(letter)} ${labels[guess.marks[column]]}`).join(', ')}` : '';
+        return `<li class="riddle-row" ${guess ? `data-riddle-guess aria-label="${escape(description)}"` : 'aria-hidden="true"'}
+          ${active ? 'data-active' : ''} ${row === animate ? 'data-stamping' : ''}>${[...answer].map((_, column) =>
+            `<span style="--riddle-cell:${column}" ${guess ? `data-mark="${guess.marks[column]}"` : ''}>${display(letters[column] || '')}</span>`).join('')}</li>`;
+      }).join('');
     }
 
-    function setDial(part, state) {
-      const {field, select, status, buttons} = dials[part];
-      field.dataset.state = state;
-      select.disabled = state === 'matched' || state === 'hint';
-      buttons.forEach(button => { button.disabled = select.disabled; });
-      status.textContent = {matched:'Đã khớp', missed:'Chưa khớp', hint:'Đã gợi ý'}[state] || '';
-      lock.style.setProperty(`--riddle-${part}-angle`, `${select.selectedIndex * 42}deg`);
+    function updateKeys(letters, marks) {
+      [...letters].forEach((letter, index) => {
+        const button = keyButtons.find(key => key.dataset.riddleKey === letter);
+        if (!button) return;
+        const mark = marks[index];
+        if (rank[button.dataset.mark] >= rank[mark]) return;
+        button.dataset.mark = mark;
+        button.setAttribute('aria-label', `${display(letter)}, ${labels[mark]}`);
+      });
     }
 
-    function showRound(shouldFocus) {
-      const round = rounds[index];
-      if (!round) {
-        form.hidden = true;
-        message.textContent = 'Chưa tìm thấy chữ Hán một âm tiết để tạo mật mã.';
+    function showRound() {
+      const puzzle = current();
+      if (!puzzle) {
+        desk.hidden = true;
+        grid.hidden = true;
+        announce('Chưa tìm được từ phù hợp để tạo mật mã.');
         return;
       }
-      mistakes = hints = 0;
-      opened = false;
-      lock.classList.remove('is-open');
-      gain.textContent = '';
-      reward.hidden = true;
-      form.hidden = false;
-      hintButton.disabled = false;
-      message.textContent = '';
-      game.querySelector('[data-riddle-word]').textContent = round.word.hanzi;
-      game.querySelector('[data-riddle-meaning]').textContent = round.word.vi;
-      const options = {
-        onset: optionsFor(round.onset, COMMON_ONSETS),
-        rime: optionsFor(round.rime, COMMON_RIMES),
-        tone: ['1', '2', '3', '4', '5']
-      };
-      for (const part of PARTS) {
-        const select = dials[part].select;
-        select.replaceChildren(new Option('Chọn', '', true, true), ...options[part].map(value =>
-          new Option(choiceLabel(part, value), value)));
-        setDial(part, '');
-      }
-      updateScore();
-      ctx.motion?.('round', lock, {round: index});
-      if (shouldFocus) dials.onset.select.focus();
-    }
-
-    function newRun(shouldFocus = false) {
-      const previous = new Set(rounds.map(round => round.word.id));
-      const pool = ctx.words(300).map(readParts).filter(Boolean);
-      const seen = new Set();
-      const unique = pool.filter(round => {
-        const code = round.onset + round.rime + round.tone;
-        if (seen.has(code)) return false;
-        seen.add(code);
-        return true;
+      history = [];
+      closed = false;
+      assisted = false;
+      composition = false;
+      input.value = '';
+      board.removeAttribute('data-outcome');
+      desk.hidden = false;
+      result.hidden = next.hidden = replay.hidden = true;
+      hint.disabled = false;
+      root.querySelector('[data-riddle-meaning]').textContent = puzzle.word.vi;
+      root.querySelector('[data-riddle-count]').textContent = `${puzzle.answer.length} chữ cái · ${ATTEMPTS} lượt`;
+      keyButtons.forEach(button => {
+        delete button.dataset.mark;
+        const key = button.dataset.riddleKey;
+        button.setAttribute('aria-label', key === 'v' ? 'V hoặc Ü' : key);
       });
-      const fresh = unique.filter(round => !previous.has(round.word.id));
-      rounds = [...fresh, ...unique.filter(round => previous.has(round.word.id))].slice(0, ROUND_COUNT);
-      index = score = 0;
-      showRound(shouldFocus);
+      updateScore();
+      announce('');
+      paintRows();
     }
 
-    function hint() {
-      if (opened) return;
-      const round = rounds[index];
-      const part = PARTS.find(name => !dials[name].select.disabled);
-      if (!part) return;
-      hints++;
-      dials[part].select.value = round[part];
-      setDial(part, 'hint');
-      ctx.motion?.('dial', lock, {part, value: dials[part].select.selectedIndex});
-      const next = PARTS.find(name => !dials[name].select.disabled);
-      hintButton.disabled = !next;
-      message.textContent = 'Đã mở một vòng. Dùng phần được gợi ý để thử mật mã.';
-      if (next) dials[next].select.focus();
-      else form.querySelector('[data-riddle-try]').focus();
+    function newRun() {
+      const previous = new Set(puzzles.map(puzzle => puzzle.word.id));
+      const pool = uniquePuzzles(ctx.words(300));
+      puzzles = [
+        ...pool.filter(puzzle => !previous.has(puzzle.word.id)),
+        ...pool.filter(puzzle => previous.has(puzzle.word.id))
+      ].slice(0, ROUND_COUNT);
+      index = score = 0;
+      showRound();
+    }
+
+    function finish(success, suppliedTone) {
+      const puzzle = current();
+      const final = index === puzzles.length - 1;
+      const toneCorrect = ctx.matchPinyin(puzzle.answer + (suppliedTone || ''), puzzle.word) === 'good';
+      closed = true;
+      board.dataset.outcome = success ? 'open' : 'closed';
+      const points = success ? Math.max(25, 120 - (history.length - 1) * 14 - Number(assisted) * 25) : 0;
+      score += points;
+      ctx.grade(puzzle.word.id, 'reading',
+        success ? history.length === 1 && toneCorrect && !assisted ? 'good' : 'almost' : 'again');
+      updateScore();
+      paintRows(history.length - 1);
+      desk.hidden = true;
+      result.hidden = false;
+      root.querySelector('[data-riddle-word]').textContent = puzzle.word.hanzi;
+      root.querySelector('[data-riddle-reading]').textContent = puzzle.word.pinyin;
+      root.querySelector('[data-riddle-translation]').textContent = puzzle.word.vi;
+      root.querySelector('[data-riddle-speak]').hidden = !ctx.voiceAvailable?.();
+      announce(success
+        ? `Ấn đã mở. +${points} điểm.${!suppliedTone || toneCorrect ? '' : ` Thanh đúng đọc là ${puzzle.word.pinyin}.`}${final ? ` Tổng ${score} điểm.` : ''}`
+        : `Đã hết ${ATTEMPTS} lượt. Mật mã là ${puzzle.word.pinyin}.${final ? ` Tổng ${score} điểm.` : ''}`);
+      next.hidden = final;
+      replay.hidden = !final;
+      if (final) ctx.complete(score);
+      (final ? replay : next).focus({preventScroll:true});
     }
 
     function submit(event) {
       event.preventDefault();
-      if (opened) return;
-      const round = rounds[index];
-      const values = Object.fromEntries(PARTS.map(part => [part, dials[part].select.value]));
-      const missing = PARTS.find(part => !values[part]);
-      if (missing) {
-        message.textContent = 'Xoay đủ cả ba vòng rồi thử mở khóa.';
-        dials[missing].select.focus();
+      if (closed || composition || !current()) return;
+      const {answer} = current();
+      const {letters, tone} = reading(input.value);
+      if (!/^[a-z]+$/.test(letters) || letters.length !== answer.length) {
+        announce(`Mật mã cần đúng ${answer.length} chữ cái Pinyin.`);
         return;
       }
-      const spelling = (values.onset === EMPTY_ONSET ? '' : values.onset) + values.rime + values.tone;
-      if (ctx.matchPinyin(spelling, round.word) !== 'good') {
-        mistakes++;
-        for (const part of PARTS) {
-          if (dials[part].select.disabled) continue;
-          setDial(part, values[part] === round[part] ? 'matched' : 'missed');
-        }
-        const missed = PARTS.filter(part => dials[part].field.dataset.state === 'missed');
-        message.textContent = missed.length
-          ? `Còn ${missed.length} vòng chưa khớp. Các vòng đúng đã được giữ lại.`
-          : 'Mật mã chưa hợp lệ. Chọn lại một vòng rồi thử tiếp.';
-        ctx.motion?.('miss', lock);
-        if (missed.length) dials[missed[0]].select.focus();
+      if (history.some(guess => guess.letters === letters)) {
+        announce('Mã này đã thử. Hãy đổi các chữ chưa khớp.');
         return;
       }
-      opened = true;
-      const points = Math.max(30, 120 - mistakes * 16 - hints * 25);
-      const final = index + 1 === rounds.length;
-      score += points;
-      gain.textContent = `+${points}`;
-      lock.classList.add('is-open');
-      form.hidden = true;
-      reward.hidden = false;
-      nextButton.hidden = final;
-      replayButton.hidden = !final;
-      updateScore();
-      message.textContent = `${round.word.hanzi} · ${round.word.pinyin}. ${final ? `Đã mở cả kho. Tổng ${score} điểm.` : `Khóa đã mở. +${points} điểm.`}`;
-      ctx.grade(round.word.id, 'reading', mistakes || hints ? 'almost' : 'good');
-      ctx.motion?.('unlock', lock, {score, final});
-      if (final) ctx.complete(score);
-      (final ? replayButton : nextButton).focus({preventScroll: true});
+      const marks = classify(letters, answer);
+      history.push({letters, marks});
+      updateKeys(letters, marks);
+      input.value = '';
+      if (letters === answer || history.length === ATTEMPTS) {
+        finish(letters === answer, tone);
+        return;
+      }
+      const exact = marks.filter(mark => mark === 'exact').length;
+      const nearby = marks.filter(mark => mark === 'nearby').length;
+      announce(`${exact} chữ đúng chỗ, ${nearby} chữ khác chỗ. Còn ${ATTEMPTS - history.length} lượt.`);
+      paintRows(history.length - 1);
     }
 
-    function change(event) {
-      const part = event.target.dataset.riddlePart;
-      if (!part) return;
-      setDial(part, '');
-      ctx.motion?.('dial', lock, {part, value: event.target.selectedIndex});
+    function onClick(event) {
+      const button = event.target.closest('button');
+      if (!button || button.disabled || !current()) return;
+      if (button.hasAttribute('data-riddle-next') && closed && index + 1 < puzzles.length) {
+        index++;
+        showRound();
+        return;
+      }
+      if (button.hasAttribute('data-riddle-replay') && closed) {
+        newRun();
+        return;
+      }
+      if (button.hasAttribute('data-riddle-speak')) {
+        ctx.speak?.(current().word.hanzi);
+        return;
+      }
+      if (closed) return;
+      if (button.hasAttribute('data-riddle-hint')) {
+        assisted = true;
+        hint.disabled = true;
+        announce(`Mật mã bắt đầu bằng ${display(current().answer[0])}.`);
+        return;
+      }
+      const key = button.dataset.riddleKey;
+      if (!key) return;
+      const letters = reading(input.value).letters.replace(/[^a-z]/g, '').slice(0, current().answer.length);
+      if (key === 'Backspace') input.value = letters.slice(0, -1);
+      else if (letters.length < current().answer.length) input.value = letters + key;
+      paintRows();
     }
 
-    function turn(event) {
-      const button = event.target.closest('[data-riddle-turn]');
-      if (!button) return;
-      const part = button.closest('[data-riddle-dial]').dataset.riddleDial;
-      const {select} = dials[part];
-      const options = select.options.length - 1;
-      const direction = Number(button.dataset.riddleTurn);
-      let current = select.selectedIndex - 1;
-      if (current < 0) current = direction === 1 ? -1 : 0;
-      select.selectedIndex = 1 + (current + direction + options) % options;
-      setDial(part, '');
-      ctx.motion?.('dial', lock, {part, value: select.selectedIndex, direction});
-    }
-
-    function nextRound() {
-      if (!opened || index + 1 >= rounds.length) return;
-      index++;
-      showRound(true);
-    }
-    function replay() { newRun(true); }
-
-    form.addEventListener('submit', submit);
-    form.addEventListener('change', change);
-    form.addEventListener('click', turn);
-    hintButton.addEventListener('click', hint);
-    nextButton.addEventListener('click', nextRound);
-    replayButton.addEventListener('click', replay);
+    const controller = new AbortController();
+    const options = {signal:controller.signal};
+    form.addEventListener('submit', submit, options);
+    input.addEventListener('input', () => { if (!composition && !closed) paintRows(); }, options);
+    input.addEventListener('compositionstart', () => { composition = true; }, options);
+    input.addEventListener('compositionend', () => { composition = false; if (!closed) paintRows(); }, options);
+    root.addEventListener('click', onClick, options);
     newRun();
     return () => {
-      form.removeEventListener('submit', submit);
-      form.removeEventListener('change', change);
-      form.removeEventListener('click', turn);
-      hintButton.removeEventListener('click', hint);
-      nextButton.removeEventListener('click', nextRound);
-      replayButton.removeEventListener('click', replay);
+      controller.abort();
+      ctx.stopSpeech?.();
     };
   };
 })();

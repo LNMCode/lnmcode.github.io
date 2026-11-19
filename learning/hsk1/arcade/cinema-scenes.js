@@ -10,14 +10,6 @@ const chapters = {
   review: {model: 'leaves', colors: [0x88e6cb, 0xc5f0b5, 0xfad791]},
   progress: {model: 'leaves', colors: [0xabd0ff, 0xbee2fb, 0xe5c49d]},
   settings: {model: 'leaves', colors: [0x7aabc7, 0x9bdbd9, 0xf3cc95]},
-  pinyin: {model: 'constellation', colors: [0x60cfff, 0xe6f5ff, 0x97a8ff]},
-  lights: {model: 'pond', colors: [0xbade72, 0xf1ffae, 0x85cbb9]},
-  wind: {model: 'wind', colors: [0xffc279, 0xffeac0, 0x7ecfff]},
-  echo: {model: 'echo', colors: [0x35dbbf, 0xb3ffde, 0x68cde7]},
-  riddle: {model: 'lock', colors: [0xffae5e, 0xffe49d, 0xef9883]},
-  strokes: {model: 'ink', colors: [0xf59a79, 0xffdfaa, 0xbd87de]},
-  pairs: {model: 'pairs', colors: [0xf8a2d5, 0xffe0ec, 0xac9fee]},
-  flow: {model: 'river', colors: [0x81ddaf, 0xd4f0ac, 0x70cbdb]},
 };
 
 function material(THREE, color, opacity = 1) {
@@ -45,10 +37,6 @@ function line(THREE, points, color, opacity, group) {
   const trail = new THREE.Line(g, m);
   group.add(trail);
   return trail;
-}
-
-function ring(THREE, radius, color, alpha, group) {
-  return mesh(THREE, new THREE.TorusGeometry(radius, .013, 5, 48), color, alpha, group);
 }
 
 function lantern(THREE, texture, colors) {
@@ -90,19 +78,6 @@ function lantern(THREE, texture, colors) {
   return group;
 }
 
-function kite(THREE, colors) {
-  const group = new THREE.Group();
-  const plane = new THREE.OctahedronGeometry(.5);
-  plane.scale(.68, 1, .3);
-  const shape = mesh(THREE, plane, colors[0], .46, group);
-  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(plane),
-    new THREE.LineBasicMaterial({color:colors[1], transparent:true, opacity:.7, depthWrite:false}));
-  shape.renderOrder = 1;
-  group.add(edges);
-  line(THREE, [[0,-.46,0],[.08,-.63,0],[-.025,-.79,0],[.13,-.97,0],[.07,-1.11,0]], colors[2], .7, group);
-  return group;
-}
-
 function pointCloud(THREE, texture, colors, amount) {
   const g = new THREE.BufferGeometry();
   const centers = Float32Array.from({length: amount * 3}, () => 0);
@@ -129,38 +104,11 @@ function accentObjects(THREE, texture, colors, model, stage) {
       return object;
     });
   }
-  if (model === 'wind') {
-    return [0,1,2].map(() => {
-      const object = kite(THREE, colors);
-      accents.add(object);
-      return object;
-    });
-  }
-  if (model === 'echo') {
-    return Array.from({length:17}, (_, i) => {
-      const object = mesh(THREE, new THREE.BoxGeometry(.055, .35, .055),
-        colors[i % colors.length], .32, accents);
-      return object;
-    });
-  }
-  if (model === 'lock') {
-    return [
-      ring(THREE, .735, colors[0], .55, accents),
-      ring(THREE, .845, colors[1], .45, accents),
-      ring(THREE, .992, colors[2], .34, accents),
-    ];
-  }
-  if (model === 'river' || model === 'pond') {
-    return Array.from({length:4}, (_, index) =>
-      ring(THREE, .66 + index * .25, colors[index % 3], .28, accents));
-  }
-  const count = model === 'ink' ? 4 : 5;
-  const shape = model === 'pairs' ? new THREE.BoxGeometry(.38,.45,.08) :
-    model === 'leaves' ? new THREE.TetrahedronGeometry(.19) : new THREE.OctahedronGeometry(.36);
+  const shape = new THREE.TetrahedronGeometry(.19);
   const edge = new THREE.EdgesGeometry(shape);
-  const objects = Array.from({length:count}, (_, index) => {
+  return Array.from({length:5}, (_, index) => {
     const object = new THREE.Group();
-    if (model === 'pairs' || model === 'leaves') mesh(THREE, shape, colors[index % 3], .21, object);
+    mesh(THREE, shape, colors[index % 3], .21, object);
     const outline = new THREE.LineSegments(edge, new THREE.LineBasicMaterial({
       color: colors[index % 3], opacity:.38, transparent:true, depthWrite:false,
     }));
@@ -168,22 +116,20 @@ function accentObjects(THREE, texture, colors, model, stage) {
     accents.add(object);
     return object;
   });
-  if (model !== 'pairs' && model !== 'leaves') shape.dispose();
-  return objects;
 }
 
 export function buildCinemaStage(THREE, texture, name) {
   const group = new THREE.Group();
   const {model,colors} = chapters[name] || chapters.home;
   const accents = accentObjects(THREE, texture, colors, model, group);
-  const amount = model === 'constellation' || model === 'pond' ? 46 : 28;
+  const amount = 28;
   const cloud = pointCloud(THREE, texture, colors, amount);
   const points = cloud.geometry.attributes.position;
   group.add(cloud);
   const seeds = Array.from({length:amount}, () => [Math.random(), Math.random(), Math.random()]);
 
   function draw(frame) {
-    const {width, height, time, entrance, activity, lane, signal, flight} = frame;
+    const {width, height, time, entrance, activity} = frame;
     const scalar = Math.min(height * .36, width * .24);
     const breath = Math.sin(time * 1.4);
     const w = width * entrance;
@@ -195,8 +141,7 @@ export function buildCinemaStage(THREE, texture, name) {
       let posX = x - .5;
       const posY = (y + time * (.023 + z * .019)) % 1 - .5;
       if (model === 'leaves') posX = (x < .5 ? -1 : 1) * (.33 + (x % .5) * .31);
-      const sway = model === 'wind' ? .08 : .016;
-      points.setXYZ(index, w * (posX + Math.sin(time * (.45 + z) + z * 31) * sway),
+      points.setXYZ(index, w * (posX + Math.sin(time * (.45 + z) + z * 31) * .016),
         h * posY, -1 + z);
     });
     points.needsUpdate = true;
@@ -212,33 +157,11 @@ export function buildCinemaStage(THREE, texture, name) {
         object.rotation.set(Math.sin(time * .7 + rand) * .17, time * .42 + rand, Math.sin(time + index) * .2);
         object.scale.setScalar(scalar * [.84,1.12,.43,.52][index]);
         if (index === 1) object.scale.multiplyScalar(1 + activity * .2);
-      } else if (model === 'wind') {
-        const steer = index === 0 ? (lane - 1) * .33 : offset * (.37 + .03 * index);
-        object.position.set(w * steer, h * (index === 0 ? -.25 + activity * .37 * flight : .15 + index * .1), .1);
-        object.scale.setScalar(scalar * (index === 0 ? .86 : .45));
-        object.rotation.set(.1 + breath*.13, Math.sin(time + index) * .37,
-          (index === 0 ? lane - 1 + Math.min(0, flight) * activity * 2 : offset) * .22 + breath*.14);
-      } else if (model === 'echo') {
-        const x = index / (accents.length - 1) - .5;
-        object.position.set(w * x * .94, h * -.14, -.1);
-        object.rotation.set(time * .24, index * .14, 0);
-        object.scale.set(scalar * .76, (scalar * (.66 + Math.abs(Math.sin(time*3.35 + index * .42)) * (signal + activity * 3))) * .56, scalar);
-      } else if (model === 'lock') {
-        object.position.set(0, h * .025, -.02 + index * .04);
-        object.rotation.set(Math.sin(time * (.28 + index * .09) + index) * .24 + activity * .18, index * .18 + activity * .32, time * (.3 + index * .12));
-        object.scale.setScalar(scalar * (1.1 + index * .11 + activity * .2));
-      } else if (model === 'river' || model === 'pond') {
-        object.position.set(offset * w * (.21 + (index%3) * .1), h * (-.2 + index * .12), -.1);
-        object.rotation.set(1.03, 0, time*.07);
-        const pulse = (time * .29 + index * .24) % 1;
-        object.scale.setScalar(scalar * (.19 + pulse * .85));
-        object.material.opacity = (1 - pulse) * (.38 + activity*.12);
       } else {
-        const edgeOffset = model === 'leaves' ? .39 : .29;
-        object.position.set(offset * w * (edgeOffset + Math.sin(time * .38 + rand) * .037),
+        object.position.set(offset * w * (.39 + Math.sin(time * .38 + rand) * .037),
           h * (-.35 + index * .16 + Math.cos(time * .71 + rand) * .05), .05 * index);
         object.rotation.set(time * (.32 + index*.1), time * .41 + index + activity*.45, breath*.1 + rand);
-        object.scale.setScalar(scalar * (model === 'leaves' ? .67 : .93));
+        object.scale.setScalar(scalar * .67);
       }
     });
   }

@@ -2,11 +2,11 @@
 
 Game học tiếng Trung bằng tiếng Việt với 300 mục từ HSK 1. Mỗi chặng đưa bạn đến một cảnh đêm để gặp từ mới, tìm lại địa điểm của từ từ trí nhớ và dùng một từ hoặc một câu để mở lối. Lịch ôn ngắt quãng giúp bạn gặp lại các từ đã học.
 
-Mở **Sân chơi** để luyện Pinyin với **Sao Pinyin**, luyện thứ tự nét của 30 chữ với **Dấu Mực**, lật thẻ chữ và nghĩa trong **Đèn Đôi** hoặc ghép câu đưa thuyền qua sông trong **Dòng Chữ**. Các trò ưu tiên từ đã gặp và lưu kỷ lục cùng tiến độ trên thiết bị.
+Mở **Sân chơi** để ghép chữ Hán với nghĩa trên bàn **Đèn Đôi**, nối nét thành ấn trong **Dấu Mực**, đoán Pinyin trong sáu lượt với **Mật Mã Âm Tiết**, hoặc dùng các mảnh câu để dựng cầu cho Cáo Đèn trong **Dòng Chữ**.
 
-Bốn trò khác gồm **Đường Gió** (đổi làn, tìm cổng đúng và bay lại với từ hay nhầm), **Trạm Vọng Âm** (dò sóng, nghe tiếng Quan thoại rồi ghi Pinyin), **Mật Mã Âm Tiết** (mở khóa bằng âm đầu, vần và thanh) và **Hồ Đom Đóm** (nhớ hai chữ theo thứ tự, có chế độ đua giờ tùy chọn). Trạm Vọng Âm dùng giọng của thiết bị; khi giọng Quan thoại không khả dụng, trò chuyển sang manh mối bằng nghĩa tiếng Việt.
+Trong **Đường Gió**, chọn chữ để chặn thiên thạch trước khi chúng chạm thành. **Sao Pinyin** và **Trạm Vọng Âm** dùng Pinyin để đón các mục tiêu đang rơi, lần lượt từ chữ Hán và nghĩa tiếng Việt. Trong **Hồ Đom Đóm**, chạm đúng bong bóng đang bơi. Các trò ưu tiên từ đã gặp và lưu kỷ lục cùng tiến độ trên thiết bị.
 
-Trong **Sân chơi**, chọn một trạm để máy quay đi theo Cáo Đèn, hoặc chọn **Dạo một vòng** để xem đủ tám trạm. Mỗi trò có mô hình Three.js phản ứng theo thao tác. Có thể bật **Giảm chuyển động** trong cài đặt. Trên màn hình cảm ứng, thao tác chụm hai ngón vẫn dùng để phóng to.
+Chọn một trạm ở **Sân chơi** hoặc dùng **Dạo một vòng** để xem tuyến đường. Mô hình Three.js nằm ngay trong sân chơi của các màn có mục tiêu chuyển động và trong cảnh dựng cầu. Các màn hành động có chế độ không tính giờ. Có thể bật **Giảm chuyển động** trong cài đặt. Trên màn hình cảm ứng, thao tác chụm hai ngón vẫn dùng để phóng to.
 
 - [Mở trò chơi trên GitHub Pages](https://lnmcode.github.io/learning/hsk1/) sau khi workflow `Deploy GitHub Pages` chạy thành công.
 - Trên iPhone, mở link trong Safari. Để thêm biểu tượng vào màn hình chính, chọn **Chia sẻ → Thêm vào MH chính**. Mở game một lần khi có mạng và kiểm tra trạng thái ngoại tuyến trong **Cài đặt** trước khi ngắt mạng.

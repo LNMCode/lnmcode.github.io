@@ -46,6 +46,12 @@ function bindCinemaScene() {
   const scene = view === 'arcade-game' ? arcadeId : view;
   const surface = app.querySelector('main.app-main');
   if (!surface) return;
+  const arena = surface.querySelector('#arcade-game');
+  if (arena) {
+    renderedScene = scene;
+    cinema?.setScene(scene, {lowMotion:lowMotion(), arena});
+    return;
+  }
   const stages = scene === 'play'
     ? '.adventure-board, .adventure-gate, .quest-screen .scene, .feedback-answer'
     : '[data-cinema-stage], .scene, .hero-hanzi, .card';
@@ -207,11 +213,10 @@ function arcadeScreen() {
   const game = arcade.games[arcadeId];
   return `<main class="app-main arcade-main">
     <header class="arcade-game-header" data-palette="${arcadeId}">
-      <button class="back-link" data-action="nav" data-view="arcade">${icon('left')} Sân chơi</button>
+      <button class="back-link" data-action="nav" data-view="arcade" aria-label="Sân chơi">${icon('left')} <span>Sân chơi</span></button>
       <h1 tabindex="-1">${esc(game.name)}</h1>
       <span class="game-skill">${esc(game.ability)}</span>
     </header>
-    ${cover(arcadeId,game.glyph,arcadeId==='lights'||arcadeId==='flow'?'river':'')}
     <div id="arcade-game"></div>
   </main>`;
 }
@@ -229,14 +234,10 @@ function mountArcade() {
       voiceAvailable: () => Boolean(window.SpeechSynthesisUtterance && mandarinVoice()),
       speak: (text, onError) => speak(text, false, onError),
       stopSpeech: () => window.speechSynthesis?.cancel(),
-      grade: (wordId, skill, quality) => E.grade(state, wordId, skill, quality, Date.now(),
-        {exercise: `arcade:${id}`}),
+      grade: (wordId, skill, quality, {hint=false}={}) => E.grade(state, wordId, skill, quality, Date.now(),
+        {hint, exercise: `arcade:${id}`}),
       complete: score => E.recordArcade(state, id, score),
       lowMotion: lowMotion(),
-      motion: (type, target, detail) => {
-        bindCinemaScene();
-        motion(type, target, detail);
-      },
       exit: () => goto('arcade'),
     });
   } catch {
@@ -682,6 +683,7 @@ function render() {
       case 'arcade-game': html=arcadeScreen(); break;
       default: view='home'; html=home();
     }
+    app.classList.toggle('arcade-shell',view==='arcade-game');
     app.innerHTML=html;
     if (view==='arcade-game') mountArcade();
     bindCinemaScene();
@@ -827,7 +829,7 @@ function finish() {
   state.active = null;
   E.save(state);
   goto('finished');
-  motion('complete', app.querySelector('.finish-icon'));
+  motion('complete', app.querySelector('.finish [data-cinema-cover]'));
 }
 function giveFeedback(quality,word,explanation='',skill=null){
   const active=state.active,task=current();
