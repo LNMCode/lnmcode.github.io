@@ -49,7 +49,7 @@
         <div class="flow-banks">
           <div class="flow-bridge" role="group" aria-label="Thứ tự các mảnh trên cầu"></div>
         </div>
-        <div class="flow-river" role="group" aria-label="Các thuyền chở mảnh chữ">
+        <div class="flow-river" data-cinema-stage role="group" aria-label="Các thuyền chở mảnh chữ">
           <div class="flow-current-water" aria-hidden="true"></div>
           <div class="flow-skiff" aria-hidden="true"><i></i></div>
           <div class="flow-tile-grid"></div>
@@ -158,15 +158,20 @@
       return tiles.filter(tile => !sequence.includes(tile));
     }
 
-    function selectTile(id) {
+    function selectTile(boat) {
       if (delivered || wrongPosition >= 0) return;
+      const id = Number(boat.dataset.flowTile);
       const tile = remainingTiles().find(item => item.index === id);
       if (!tile) return;
+      const bounds = boat.getBoundingClientRect();
+      const from = {x: (bounds.left + bounds.width / 2) / window.innerWidth,
+        y: (bounds.top + bounds.height / 2) / window.innerHeight};
       sequence.push(tile);
       const left = remainingTiles().length;
       start = left ? start % left : 0;
       message = left ? `Đã vớt ${tile.text}.` : 'Cầu đã đủ mảnh. Đưa thuyền qua để kiểm tra thứ tự.';
       update();
+      ctx.motion?.('boat', banks.children[sequence.length - 1], {from});
       focus(left ? '.flow-tile-grid button' : '[data-flow-send]');
     }
 
@@ -175,6 +180,7 @@
       sequence.splice(index, 1);
       message = 'Mảnh đã trở lại dòng nước.';
       update();
+      ctx.motion?.('select', river);
       focus('[data-flow-tile]');
     }
 
@@ -187,6 +193,7 @@
       river.classList.add('is-cycling');
       message = 'Một nhóm thuyền khác đã trôi đến.';
       update();
+      ctx.motion?.('drift', river);
       focus('[data-flow-cycle]');
     }
 
@@ -201,6 +208,7 @@
       }
       message = `Mảnh ở vị trí ${index + 1} là ${sentence.tokens[index]}.`;
       live.textContent = message;
+      ctx.motion?.('hint', banks.children[index]);
     }
 
     function send() {
@@ -211,6 +219,7 @@
         mistakes++;
         message = `Thuyền dừng ở mảnh thứ ${wrongPosition + 1}. Giữ lại đoạn đúng và thử tiếp.`;
         update();
+        ctx.motion?.('miss', banks.children[wrongPosition]);
         focus('[data-flow-repair]');
         return;
       }
@@ -220,9 +229,13 @@
       const quality = hints || mistakes ? 'almost' : 'good';
       for (const id of new Set(sentence.wordIds)) ctx.grade(id, 'usage', quality);
       update();
+      ctx.motion?.('sail', river, {fromX:.2, fromY:.86, toX:.79, toY:.19});
       const final = current + 1 === rounds.length;
       focus(final ? '[data-flow-replay]' : '[data-flow-next]');
-      if (final) ctx.complete(points);
+      if (final) {
+        ctx.motion?.('reward', banks);
+        ctx.complete(points);
+      }
     }
 
     function repair() {
@@ -242,7 +255,7 @@
     function onClick(event) {
       const target = event.target.closest('button');
       if (!target || target.disabled) return;
-      if (target.hasAttribute('data-flow-tile')) selectTile(Number(target.dataset.flowTile));
+      if (target.hasAttribute('data-flow-tile')) selectTile(target);
       if (target.hasAttribute('data-flow-slot')) removeTile(Number(target.dataset.flowSlot));
       if (target.hasAttribute('data-flow-cycle')) cycle();
       if (target.hasAttribute('data-flow-hint')) hint();

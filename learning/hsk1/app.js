@@ -3,9 +3,12 @@
 const E=window.HSK_ENGINE,D=E.D,W=E.W,M=E.M,R=E.R,S=E.S,ST=E.ST;
 const app=document.getElementById('app');
 const arcade=window.HSK_ARCADE;
+const reduceMedia=matchMedia('(prefers-reduced-motion: reduce)');
+const cinema=window.HSK_CINEMA?.mount(document.getElementById('hsk-cinema'));
 let state=E.load();
 let arcadeId=null, stopArcade=null;
 let view='home', selectedRegion=null,wordTerm='',wordFilter='all',dictLimit=35,wordId=null,storyRegion=null,storyShowPinyin=false,storyRevealed={},reviewSkill='all',reviewCount=state.preferences.sessionSize,toaster=null;
+let renderedScene = '';
 const esc=s=>String(s??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const hanzi=s=>`<span lang="zh-Hans" class="zh">${esc(s)}</span>`;
 const fmtPercent=(a,b)=>b?Math.round(a/b*100):0;
@@ -30,6 +33,28 @@ function saveUnlessUnavailable(nextState){
   if(E.save(nextState))return true;
   toast('Trình duyệt không lưu được thay đổi. Tiến độ hiện tại vẫn đang mở.');
   return false;
+}
+
+function lowMotion() {
+  return state.preferences.lowMotion || reduceMedia.matches;
+}
+
+function bindCinemaScene() {
+  const scene = view === 'arcade-game' ? arcadeId : view;
+  const surface = app.querySelector('main.app-main');
+  if (!surface) return;
+  const stages = scene === 'play'
+    ? '.adventure-board, .adventure-gate, .quest-screen .scene, .feedback-answer'
+    : '[data-cinema-stage], .scene, .hero-hanzi, .card';
+  const anchor = [...surface.querySelectorAll(stages)].find(element => element.getClientRects().length);
+  if (renderedScene !== scene && !lowMotion()) surface.classList.add('cinema-scene-entry');
+  renderedScene = scene;
+  cinema?.setScene(scene, {lowMotion:lowMotion(), anchor});
+}
+
+function motion(type, target, detail) {
+  if (lowMotion()) return;
+  cinema?.cue(type, target, detail);
 }
 
 const adventureDefaults = {
@@ -85,7 +110,7 @@ function arcadeLobby() {
     </button>`;
   }).join('');
   return frame(`<section class="arcade-lobby">
-      <header class="arcade-lobby-title"><h1>Sân chơi đèn lồng</h1>
+      <header class="arcade-lobby-title" data-cinema-stage><h1>Sân chơi đèn lồng</h1>
         <p>Nghe, đọc, viết và vận dụng từ theo nhịp của bạn.</p></header>
       <div class="arcade-grid">${cards||'<p>Sân chơi chưa tải được. Hãy tải lại trang.</p>'}</div>
     </section>`, 'arcade');
@@ -118,9 +143,11 @@ function mountArcade() {
       grade: (wordId, skill, quality) => E.grade(state, wordId, skill, quality, Date.now(),
         {exercise: `arcade:${id}`}),
       complete: score => E.recordArcade(state, id, score),
-      lowMotion: state.preferences.lowMotion || matchMedia('(prefers-reduced-motion: reduce)').matches,
-      gameVisual: canvas => window.HSK_ARCADE_VISUAL?.(canvas,
-        state.preferences.lowMotion || matchMedia('(prefers-reduced-motion: reduce)').matches),
+      lowMotion: lowMotion(),
+      motion: (type, target, detail) => {
+        bindCinemaScene();
+        motion(type, target, detail);
+      },
       exit: () => goto('arcade'),
     });
   } catch {
@@ -535,7 +562,7 @@ function renderPlay(){
   return `<main class="app-main play-main">${content}</main>`;
 }
 function render() {
-  document.body.classList.toggle('reduce-motion',state.preferences.lowMotion);
+  document.body.classList.toggle('reduce-motion',lowMotion());
   try {
     if (stopArcade) {
       const stop = stopArcade;
@@ -560,12 +587,18 @@ function render() {
     }
     app.innerHTML=html;
     if (view==='arcade-game') mountArcade();
+    bindCinemaScene();
     if (!E.storageHealthy()) toast('Trình duyệt không lưu được tiến độ. Hãy dùng tính năng sao lưu.');
   } catch(err) {
     console.error('Render error',err);
     app.innerHTML=`<div class="app-main error-screen"><h2>Gặp lỗi hiển thị</h2><p>Hãy tải lại trang. Dữ liệu đã lưu vẫn được giữ trên thiết bị.</p><button class="btn primary" data-action="reload">Tải lại</button></div>`;
   }
 }
+
+reduceMedia.addEventListener?.('change', () => {
+  document.body.classList.toggle('reduce-motion', lowMotion());
+  bindCinemaScene();
+});
 function goto(next) {
   view=next;
   render();
@@ -607,6 +640,8 @@ function visitSpot(id) {
   if (result.found) E.see(state,id,false);
   E.save(state);
   render();
+  const marker = app.querySelector(`[data-action="trail-spot"][data-id="${id}"]`);
+  motion(result.correct === true ? 'lantern' : result.correct === false ? 'miss' : 'discover', marker);
   if (result.correct) {
     focusAdventure(result.progress.solved.length === task.wordIds.length
       ? '[data-action="trail-gate"]' : '#adventure-clue');
@@ -625,6 +660,7 @@ function beginTrailRecall() {
   E.save(state);
   render();
   scrollUp();
+  motion('tune', app.querySelector('.adventure-board'));
   focusAdventure('#adventure-clue');
 }
 function showTrailHint() {
@@ -635,11 +671,16 @@ function showTrailHint() {
   active.trail = {...progress,hinted:true,missed:null};
   E.save(state);
   render();
-  focusAdventure(`[data-action="trail-spot"][data-id="${task.order[progress.solved.length]}"]`);
+  const marker = `[data-action="trail-spot"][data-id="${task.order[progress.solved.length]}"]`;
+  motion('hint', app.querySelector(marker));
+  focusAdventure(marker);
 }
 function openTrailGate() {
   const task = current();
-  if (task?.type === 'trail' && E.trailState(task,state.active.trail).solved.length === task.wordIds.length) nextTask();
+  if (task?.type === 'trail' && E.trailState(task,state.active.trail).solved.length === task.wordIds.length) {
+    nextTask();
+    motion('enter', app.querySelector('.adventure-gate'));
+  }
 }
 function nextTask(){
   const active=state.active;
@@ -682,6 +723,7 @@ function finish() {
   state.active = null;
   E.save(state);
   goto('finished');
+  motion('complete', app.querySelector('.finish-icon'));
 }
 function giveFeedback(quality,word,explanation='',skill=null){
   const active=state.active,task=current();
@@ -708,6 +750,8 @@ function giveFeedback(quality,word,explanation='',skill=null){
   E.save(state);
   render();
   scrollUp();
+  motion(success ? (task.gate ? 'unlock' : 'success') : 'miss',
+    app.querySelector('.adventure-gate-icon, .feedback-emoji'));
   focusPlayHeading();
 }
 function answerMeaning(value){
@@ -813,7 +857,7 @@ app.addEventListener('click',e=>{
  if(act==='reload'){location.reload();return;}
  if(act==='nav'){goto(b.dataset.view);return;}
  if(act==='arcade-start'&&arcade&&Object.hasOwn(arcade.games,id)){arcadeId=id;goto('arcade-game');return;}
- if(act==='region'){selectedRegion=id;render();return;}
+ if(act==='region'){selectedRegion=id;render();motion('discover',app.querySelector('.region-card.expanded .scene'));return;}
  if(act==='start-mission'){startMission(id);return;}
  if(act==='begin-next'){const next=nextMission();startMission(next.id);return;}
  if(act==='switch-to-trail'){

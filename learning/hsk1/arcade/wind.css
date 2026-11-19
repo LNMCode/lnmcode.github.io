@@ -191,6 +191,7 @@
 .wind-stage.has-draft .wind-kite { filter: drop-shadow(0 0 13px #82fff2); }
 .wind-stage[data-flight="pass"] .wind-kite { top: 13%; opacity: .36; }
 .wind-stage[data-flight="miss"] .wind-kite { top: 82%; opacity: .55; }
+body:has(#hsk-cinema[data-visual="3d"]) .wind-stage .wind-kite { opacity: 0; }
 .wind-controls {
   display: grid;
   grid-template-columns: 51px minmax(0, 1fr) 51px;

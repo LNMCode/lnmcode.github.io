@@ -13,7 +13,8 @@ const artworks = ['./art/school.webp', './art/market.webp', './art/river.webp'];
 const arcade = ['catalog.js', 'visual.js', 'strokes.js', 'strokes-data.js', 'pinyin.js',
   'pairs.js', 'flow.js', 'arcade.css', 'memory-games.css', 'vendor/three.module.min.js',
   'vendor/three.core.min.js', 'wind.js', 'echo.js', 'riddle.js', 'lights.js',
-  'wind.css', 'echo.css', 'riddle.css', 'lights.css'].map(name => './arcade/' + name);
+  'wind.css', 'echo.css', 'riddle.css', 'lights.css', 'cinema.css',
+  'cinema-scenes.js'].map(name => './arcade/' + name);
 
 function localResource(base, reference) {
   const url = new URL(reference, base);
@@ -88,6 +89,8 @@ for (const page of pages) {
   test(`tài nguyên và PWA nằm trong đường dẫn ${new URL(page).pathname}`, () => {
     const base = new URL(page);
     const html = readFileSync(path.join(appRoot, 'index.html'), 'utf8');
+    assert.equal([...html.matchAll(/<canvas\b[^>]*id="hsk-cinema"/g)].length, 1);
+    assert.doesNotMatch(html, /user-scalable=|maximum-scale=/i);
     const resources = [...html.matchAll(/<(?:link|script)\b[^>]*(?:href|src)="([^"]+)"/gi)]
       .map((match) => match[1]);
     assert.ok(resources.length >= 7);

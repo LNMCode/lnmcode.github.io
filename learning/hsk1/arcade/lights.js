@@ -33,8 +33,8 @@
         </div>
         <div class="lights-hud"><strong data-lights-crossing></strong><span data-lights-score></span></div>
         <ol class="lights-clues" aria-label="Thứ tự các nghĩa cần tìm"></ol>
-        <div class="lights-lake" data-lights-lake>
-          <canvas aria-hidden="true"></canvas>
+        <div class="lights-lake" data-lights-lake data-cinema-stage>
+          <div class="lights-path" aria-hidden="true" hidden></div>
           <div class="lights-pads" aria-label="Chữ trên hồ"></div>
         </div>
         <progress class="lights-timer" max="${beatDuration}" value="${beatDuration}" aria-label="Thời gian còn lại" hidden></progress>
@@ -49,7 +49,7 @@
     const game = root.querySelector('.lights-game');
     const board = game.querySelector('.lights-pads');
     const lake = game.querySelector('.lights-lake');
-    const canvas = lake.querySelector('canvas');
+    const path = lake.querySelector('.lights-path');
     const clues = game.querySelector('.lights-clues');
     const status = game.querySelector('[data-lights-status]');
     const progress = game.querySelector('.lights-timer');
@@ -58,7 +58,6 @@
     const hint = game.querySelector('[data-lights-hint]');
     const next = game.querySelector('[data-lights-next]');
     const replay = game.querySelector('[data-lights-replay]');
-    const stopVisual = ctx.lowMotion ? null : ctx.gameVisual?.(canvas);
     const records = new Map();
     let route, round, goal, pads, found, points, streak, assisted, misses;
     let stopped = false;
@@ -98,6 +97,7 @@
         streak = 0;
         const firstMissing = goal[found.length];
         ctx.grade(firstMissing.id, 'hanzi', 'again');
+        ctx.motion?.('miss', records.get(firstMissing.id)?.button || lake);
         showCrossing(false);
       } else {
         tickTimer = requestAnimationFrame(ticking);
@@ -107,7 +107,6 @@
     function syncTimer() {
       cancelAnimationFrame(tickTimer);
       tickTimer = 0;
-      canvas.dataset.paused = String(paused);
       if (timed && !paused && !document.hidden && !betweenRounds && !finished && !stopped) {
         lastFrame = performance.now();
         tickTimer = requestAnimationFrame(ticking);
@@ -129,6 +128,7 @@
       hint.disabled = false;
       pause.disabled = false;
       lake.removeAttribute('data-cleared');
+      path.hidden = true;
       board.replaceChildren(...pads.map((word, index) => {
         const [x, y] = positions[index];
         const button = document.createElement('button');
@@ -178,10 +178,24 @@
       const answer = goal.map(word => `${word.hanzi} (${word.pinyin})`).join(' · ');
       const result = success ? 'Đã nối vệt sáng.' : 'Đom đóm đã bay đi.';
       say(`${result} ${answer}${finished ? ` · Tổng ${points} điểm` : ''}`, success ? 'good' : 'miss');
-      if (finished) ctx.complete(points);
+      if (finished) {
+        if (success) ctx.motion?.('reward', lake, {score: points});
+        ctx.complete(points);
+      }
       next.hidden = finished;
       replay.hidden = !finished;
       (finished ? replay : next).focus({preventScroll:true});
+    }
+
+    function lightPath(from, to) {
+      const dx = to.x - from.x;
+      const dy = to.y - from.y;
+      const length = Math.hypot(dx, dy);
+      const normalX = .65 * dy / length;
+      const normalY = -.65 * dx / length;
+      const edge = (spot, side) => `${spot.x + side * normalX}% ${spot.y + side * normalY}%`;
+      path.style.clipPath = `polygon(${edge(from, 1)}, ${edge(to, 1)}, ${edge(to, -1)}, ${edge(from, -1)})`;
+      path.hidden = false;
     }
 
     function catchLight(id) {
@@ -192,6 +206,7 @@
         if (!misses.has(word.id) && !assisted.has(word.id)) ctx.grade(word.id, 'hanzi', 'again');
         misses.add(word.id);
         streak = 0;
+        ctx.motion?.('miss', spot.button);
         hud();
         say(`Chưa tới chữ này. Hãy tìm chữ mang nghĩa “${word.vi}”.`, 'miss');
         return;
@@ -200,8 +215,10 @@
       streak = clean ? streak + 1 : 0;
       points += clean ? 100 + Math.min(streak - 1, 5) * 15 : 35;
       if (clean) ctx.grade(id, 'hanzi', 'good');
+      const previous = records.get(found.at(-1));
       found.push(id);
-      canvas.dispatchEvent(new CustomEvent('hsk-arcade-pulse', {detail:{x:spot.x / 100, y:spot.y / 100}}));
+      if (previous) lightPath(previous, spot);
+      ctx.motion?.(previous ? 'connect' : 'success', spot.button, {from: previous?.button});
       spot.button.classList.remove('is-hinted');
       spot.button.classList.add('is-lit');
       spot.button.disabled = true;
@@ -238,7 +255,9 @@
       } else if (target === hint) {
         const word = goal[found.length];
         assisted.add(word.id);
-        records.get(word.id).button.classList.add('is-hinted');
+        const button = records.get(word.id).button;
+        button.classList.add('is-hinted');
+        ctx.motion?.('hint', button);
         say(`Tìm đốm chữ ${word.hanzi} (${word.pinyin}).`);
       } else if (target.dataset.lightsWord) {
         catchLight(target.dataset.lightsWord);
@@ -253,7 +272,6 @@
       cancelAnimationFrame(tickTimer);
       root.removeEventListener('click', click);
       document.removeEventListener('visibilitychange', syncTimer);
-      stopVisual?.();
     };
   };
 })();

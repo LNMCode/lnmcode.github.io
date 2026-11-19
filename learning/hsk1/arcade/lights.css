@@ -73,15 +73,17 @@
 .lights-lake[data-cleared]::after {
   opacity: 1;
 }
-.lights-lake canvas, .lights-pads {
+.lights-path, .lights-pads {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
 }
-.lights-lake canvas {
+.lights-path {
   pointer-events: none;
-  opacity: .68;
+  background: linear-gradient(120deg, #d3f591, #f5ffcb 52%, #b6f67b);
+  opacity: .9;
+  animation: lights-path .42s ease-out;
 }
 .lights-pad {
   position: absolute;
@@ -126,11 +128,14 @@
 @keyframes lights-hover {
   50% { transform: translateY(-3px); }
 }
+@keyframes lights-path {
+  from { opacity: .12; }
+}
 .lights-lake[data-paused] .lights-pad span,
 .reduce-motion .lights-pad span {
   animation: none;
 }
 @media (prefers-reduced-motion: reduce) {
   .lights-lake::after { transition: none; }
-  .lights-pad span { animation: none; }
+  .lights-pad span, .lights-path { animation: none; }
 }

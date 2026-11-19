@@ -20,8 +20,8 @@
           <div><span>Điểm</span><strong data-pinyin-score></strong></div>
           <div><span>Chuỗi đúng</span><strong data-pinyin-combo></strong></div>
         </div>
-        <div class="pinyin-sky">
-          <canvas data-pinyin-canvas aria-hidden="true"></canvas>
+        <div class="pinyin-sky" data-cinema-stage>
+          <svg class="pinyin-constellation" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
           <div class="pinyin-targets" aria-label="Các sao chữ Hán"></div>
           <span class="pinyin-pulse" aria-hidden="true" hidden></span>
           <span class="pinyin-origin" aria-hidden="true"></span>
@@ -52,7 +52,8 @@
 
     const game = root.querySelector('[data-pinyin-game]');
     const sky = game.querySelector('.pinyin-sky');
-    const canvas = game.querySelector('canvas');
+    const constellation = game.querySelector('.pinyin-constellation');
+    const origin = game.querySelector('.pinyin-origin');
     const layer = game.querySelector('.pinyin-targets');
     const input = game.querySelector('[data-pinyin-input]');
     const launch = game.querySelector('[data-pinyin-launch]');
@@ -65,11 +66,11 @@
     const result = game.querySelector('.pinyin-result');
     const listeners = new AbortController();
     const reducedMotion = Boolean(ctx.lowMotion) || matchMedia('(prefers-reduced-motion: reduce)').matches;
-    let releaseVisual;
     let words;
     let waves;
     let wave;
     let targets;
+    let lastConnected;
     let selected;
     let score;
     let streak;
@@ -79,17 +80,6 @@
     let transitioning;
     let composing = false;
     let pendingTimer = 0;
-
-    function startVisual() {
-      if (!releaseVisual && !reducedMotion && !paused && !done && !document.hidden) {
-        releaseVisual = ctx.gameVisual?.(canvas);
-      }
-    }
-
-    function stopVisual() {
-      releaseVisual?.();
-      releaseVisual = undefined;
-    }
 
     function setStatus(message, tone = '') {
       status.textContent = message;
@@ -107,7 +97,7 @@
       input.readOnly = locked;
       launch.disabled = hint.disabled = pass.disabled = locked;
       pause.disabled = done || transitioning;
-      canvas.dataset.paused = String(paused);
+      sky.toggleAttribute('data-cinema-paused', paused);
       game.classList.toggle('is-paused', paused);
       game.querySelector('.pinyin-paused').hidden = !paused;
       pause.setAttribute('aria-pressed', String(paused));
@@ -128,6 +118,8 @@
     function showWave() {
       const current = waves[wave];
       layer.replaceChildren();
+      constellation.replaceChildren();
+      lastConnected = null;
       targets = current.map((word, index) => {
         const [x, y] = SPOTS[current.length][index];
         const button = document.createElement('button');
@@ -179,16 +171,16 @@
         return;
       }
       showWave();
-      startVisual();
+      ctx.motion?.('pause', sky, {paused: false});
     }
 
     function finish() {
       done = true;
-      stopVisual();
       syncControls();
       game.querySelector('.pinyin-play').hidden = true;
       result.hidden = false;
       result.querySelector('[data-pinyin-summary]').textContent = `Đã nối ${hits}/${words.length} sao · ${score} điểm`;
+      if (hits) ctx.motion?.('reward', sky);
       ctx.complete(score);
       result.querySelector('h2').focus({ preventScroll: true });
     }
@@ -207,6 +199,21 @@
       } else {
         finish();
       }
+    }
+
+    function connectStar(target) {
+      ctx.motion?.('hit', target.button.firstElementChild);
+      if (lastConnected) {
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', lastConnected.x);
+        line.setAttribute('y1', lastConnected.y);
+        line.setAttribute('x2', target.x);
+        line.setAttribute('y2', target.y);
+        line.setAttribute('vector-effect', 'non-scaling-stroke');
+        constellation.append(line);
+        ctx.motion?.('link', target.button, {from: lastConnected.button});
+      }
+      lastConnected = target;
     }
 
     function clearTarget(target, success) {
@@ -230,6 +237,7 @@
       syncHud();
 
       if (!success || reducedMotion) {
+        if (success) connectStar(target);
         finishTarget(target);
         return;
       }
@@ -243,8 +251,9 @@
       pulse.style.setProperty('--pinyin-flight-y', `${dy}px`);
       pulse.hidden = false;
       target.button.classList.add('is-struck');
+      ctx.motion?.('launch', target.button.firstElementChild, {from: origin});
       pendingTimer = setTimeout(() => {
-        canvas.dispatchEvent(new CustomEvent('hsk-arcade-pulse', { detail: { x, y } }));
+        connectStar(target);
         finishTarget(target);
       }, 470);
     }
@@ -267,6 +276,7 @@
         selected.button.classList.remove('is-missed');
         void selected.button.offsetWidth;
         selected.button.classList.add('is-missed');
+        ctx.motion?.('miss', selected.button);
       }
     }
 
@@ -276,12 +286,8 @@
       if (control === pause) {
         paused = !paused;
         syncControls();
-        if (paused) {
-          input.blur();
-          stopVisual();
-        } else {
-          startVisual();
-        }
+        if (paused) input.blur();
+        ctx.motion?.('pause', sky, {paused});
         return;
       }
       if (control.hasAttribute('data-pinyin-replay')) {
@@ -293,6 +299,7 @@
       if (control === hint && selected) {
         selected.helped = true;
         setStatus(`${selected.word.hanzi} · ${selected.word.pinyin} · ${selected.word.vi}`, 'learn');
+        ctx.motion?.('hint', selected.button);
       } else if (control === pass && selected) {
         clearTarget(selected, false);
       } else if (control.hasAttribute('data-pinyin-target')) {
@@ -300,6 +307,7 @@
         if (target && selected !== target) {
           selectTarget(target);
           setStatus('Gõ âm đọc của sao bạn vừa chọn.');
+          ctx.motion?.('select', control);
         }
       }
     }
@@ -315,16 +323,11 @@
         event.preventDefault();
       }
     }, options);
-    document.addEventListener('visibilitychange', () => {
-      if (document.hidden) stopVisual();
-      else startVisual();
-    }, options);
     start();
 
     return () => {
       listeners.abort();
       clearTimeout(pendingTimer);
-      stopVisual();
     };
   }
 

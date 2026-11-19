@@ -80,7 +80,7 @@
     linear-gradient(135deg, #0d1728, #081123);
 }
 
-.pinyin-sky canvas,
+.pinyin-constellation,
 .pinyin-targets {
   position: absolute;
   inset: 0;
@@ -88,8 +88,17 @@
   height: 100%;
 }
 
-.pinyin-sky canvas {
+.pinyin-constellation {
   pointer-events: none;
+}
+
+.pinyin-constellation line {
+  stroke: #a6eafd;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  opacity: .72;
+  filter: drop-shadow(0 0 3px #68c5fa);
+  animation: pinyin-connect .55s ease-out both;
 }
 
 .pinyin-target {
@@ -291,15 +300,23 @@
   100% { transform: translate(-50%, -50%) translate(var(--pinyin-flight-x), var(--pinyin-flight-y)) scale(2.4); opacity: 0; }
 }
 
+@keyframes pinyin-connect {
+  from { opacity: .12; }
+  38% { opacity: 1; }
+  to { opacity: .72; }
+}
+
 .pinyin-reduced .pinyin-star,
-.pinyin-reduced .pinyin-glyph {
+.pinyin-reduced .pinyin-glyph,
+.pinyin-reduced .pinyin-constellation line {
   animation: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .pinyin-star,
   .pinyin-glyph,
-  .pinyin-pulse {
+  .pinyin-pulse,
+  .pinyin-constellation line {
     animation: none;
   }
 }

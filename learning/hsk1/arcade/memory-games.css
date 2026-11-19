@@ -142,6 +142,7 @@
 .pair-card.is-paired .pair-card-value {
   color: #211627;
   background: linear-gradient(135deg, #ffe4b2, #e5af6f);
+  animation: pair-lantern .5s ease-out both;
 }
 .flow-message {
   display: grid;
@@ -209,8 +210,9 @@
   border: 1px solid #679da995;
   border-radius: .95rem;
   background:
-    radial-gradient(ellipse at 46% 30%, #1d5f6c9c, transparent 70%),
-    linear-gradient(155deg, #0d303d, #081d2b);
+    linear-gradient(165deg, #08273850, #071923d9),
+    url('../art/river.webp') 56% 59% / cover,
+    #081d2b;
 }
 .flow-current-water {
   position: absolute;
@@ -257,7 +259,7 @@
   position: absolute;
   z-index: -1;
   bottom: .6rem;
-  left: 48%;
+  left: 16%;
   width: 1.65rem;
   aspect-ratio: 1.4;
   border-radius: 40% 40% 50% 50%;
@@ -274,8 +276,14 @@
   clip-path: polygon(50% 0, 100% 100%, 0 100%);
 }
 .flow-river.is-delivered .flow-skiff {
-  bottom: calc(100% - 1.6rem);
-  transition: bottom .72s cubic-bezier(.25, .35, .43, 1);
+  bottom: 74%;
+  left: 75%;
+  transition: bottom .85s cubic-bezier(.25, .35, .43, 1), left .85s cubic-bezier(.25, .35, .43, 1);
+}
+@keyframes pair-lantern {
+  0% { box-shadow: inset 0 0 0 #fff5b000; }
+  45% { box-shadow: inset 0 0 26px #fff5b0; }
+  100% { box-shadow: inset 0 0 0 #fff5b000; }
 }
 @keyframes flow-water {
   to { transform: translateY(2.7rem); }
@@ -289,7 +297,8 @@
   transition: none;
 }
 .reduce-motion .flow-current-water,
-.reduce-motion .flow-river.is-cycling .flow-tile {
+.reduce-motion .flow-river.is-cycling .flow-tile,
+.reduce-motion .pair-card.is-paired .pair-card-value {
   animation: none;
 }
 @media (prefers-reduced-motion: reduce) {
@@ -298,7 +307,8 @@
     transition: none;
   }
   .flow-current-water,
-  .flow-river.is-cycling .flow-tile {
+  .flow-river.is-cycling .flow-tile,
+  .pair-card.is-paired .pair-card-value {
     animation: none;
   }
 }

@@ -1,164 +1,546 @@
 (() => {
   'use strict';
 
-  const threeUrl = new URL('./vendor/three.module.min.js', document.currentScript.src).href;
+  const base = new URL('./', document.currentScript.src);
+  const threeUrl = new URL('vendor/three.module.min.js', base).href;
+  const scenesUrl = new URL('cinema-scenes.js', base).href;
+  const worldHeight = 10;
+  const maxEffects = 12;
+  const particleCount = 36;
+  const easeOut = n => 1 - (1 - n) ** 3;
+  const clamp = (value, min = 0, max = 1) => Math.max(min, Math.min(max, value));
+  const finite = value => typeof value === 'number' && Number.isFinite(value);
+  const mix = (a, b, blend) => a + (b - a) * blend;
+  const trajectory = {kite:1.6, wind:.27, link:.22, boat:.38, ink:.22, comet:.48};
 
-  function start(canvas, THREE, lowMotion, context) {
-    const renderer = new THREE.WebGLRenderer({canvas, context, alpha: true, antialias: true,
-      powerPreference: 'low-power'});
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
-    const scene = new THREE.Scene();
-    const camera = new THREE.OrthographicCamera(-5, 5, 3, -3, .1, 80);
-    camera.position.z = 22;
-    const depth = new THREE.Group();
-    scene.add(depth);
+  const recipes = {
+    enter: {rings: 1, amount: 8, size: .33, life: .7},
+    enterGame: {rings: 2, amount: 14, size: .62, life: .8},
+    launch: {travel: 'comet', life: .47},
+    hit: {rings: 2, amount: 24, size: .89, life: .78},
+    miss: {rings: 1, amount: 9, size: .47, life: .56, color: 0xfa8c80},
+    select: {rings: 1, amount: 7, size: .42, life: .46},
+    hint: {rings: 2, amount: 11, size: .63, life: .79, color: 0xffe8ab},
+    discover: {rings: 2, amount: 17, size: .61, life: .65},
+    lantern: {rings: 2, amount: 26, size: .9, life: .92, color: 0xffc476},
+    unlock: {rings: 3, amount: 29, size: 1.22, life: 1.09},
+    complete: {rings: 3, amount: 36, size: 1.85, life: 1.26},
+    reward: {rings: 3, amount: 36, size: 1.44, life: 1.14},
+    success: {rings: 2, amount: 20, size: .88, life: .76},
+    steer: {amount: 0, life: .3},
+    drift: {travel: 'wind', rings: 0, amount: 6, size: .49, life: .69},
+    gust: {travel: 'wind', rings: 1, amount: 8, size: .46, life: .7},
+    cross: {travel: 'kite', rings: 2, amount: 16, size: .75, life: .76},
+    tune: {rings: 2, amount: 4, size: .68, life: .59},
+    listen: {rings: 3, amount: 9, size: 1.1, life: .94},
+    dial: {rings: 1, amount: 5, size: .58, life: .47},
+    ink: {travel: 'ink', amount: 12, size: .53, life: .52},
+    seal: {rings: 2, amount: 26, size: 1.02, life: .92},
+    collect: {rings: 2, amount: 16, size: .69, life: .79},
+    flip: {rings: 1, amount: 7, size: .54, life: .48},
+    link: {travel: 'link', amount: 12, size: .58, life: .69},
+    connect: {travel: 'link', rings: 2, amount: 12, size: .65, life: .77},
+    match: {travel: 'link', rings: 2, amount: 15, size: .76, life: .73},
+    boat: {travel: 'boat', amount: 7, size: .44, life: .61},
+    sail: {travel: 'boat', rings: 1, amount: 16, size: .74, life: .88},
+  };
+  const gameNames = new Set(['wind','echo','riddle','lights','pinyin','strokes','pairs','flow']);
+  let rendererModules;
 
-    const stars = new THREE.BufferGeometry();
-    const coordinates = new Float32Array(270);
-    for (let i = 0; i < coordinates.length; i += 3) {
-      coordinates[i] = (Math.random() - .5) * 25;
-      coordinates[i + 1] = (Math.random() - .5) * 11;
-      coordinates[i + 2] = (Math.random() - .5) * 10;
+  function loadModules() {
+    rendererModules ||= Promise.all([import(threeUrl), import(scenesUrl)]);
+    return rendererModules;
+  }
+
+  function textureFor(THREE) {
+    const dimension = 64;
+    const pixels = new Uint8Array(dimension * dimension * 4);
+    for (let y = 0; y < dimension; y++) {
+      for (let x = 0; x < dimension; x++) {
+        const radius = Math.hypot(x / 31.5 - 1, y / 31.5 - 1);
+        const index = (y * dimension + x) * 4;
+        pixels[index] = pixels[index + 1] = pixels[index + 2] = 255;
+        pixels[index + 3] = Math.round(255 * Math.max(0, 1 - radius) ** 2.25);
+      }
     }
-    stars.setAttribute('position', new THREE.BufferAttribute(coordinates, 3));
-    const starlight = new THREE.PointsMaterial({size: .055, color: 0x8ce8f4, transparent: true, opacity: .8});
-    depth.add(new THREE.Points(stars, starlight));
+    const texture = new THREE.DataTexture(pixels, dimension, dimension);
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.needsUpdate = true;
+    return texture;
+  }
 
-    const crystal = new THREE.OctahedronGeometry(1);
-    const wire = new THREE.EdgesGeometry(crystal);
-    crystal.dispose();
-    const glimmer = new THREE.LineBasicMaterial({color: 0x89d8ee, transparent: true, opacity: .32});
-    const prisms = Array.from({length: 6}, (_, index) => {
-      const shape = new THREE.LineSegments(wire, glimmer);
-      shape.position.set((index % 2 ? 1 : -1) * (1.45 + index * .38), (index - 2.5) * .88, -2 - index);
-      shape.scale.setScalar(.24 + (index % 3) * .12);
-      depth.add(shape);
-      return shape;
+  function releaseGroup(group) {
+    const geometries = new Set();
+    const materials = new Set();
+    group.traverse(node => {
+      if (node.geometry) geometries.add(node.geometry);
+      if (node.material) materials.add(node.material);
     });
+    geometries.forEach(geometry => geometry.dispose());
+    materials.forEach(material => material.dispose());
+    group.removeFromParent();
+  }
 
-    const sparkGeometry = new THREE.BufferGeometry();
-    const sparkCount = 48;
-    const sparkPositions = new THREE.BufferAttribute(new Float32Array(sparkCount * 3), 3);
-    sparkGeometry.setAttribute('position', sparkPositions);
-    const sparkLight = new THREE.PointsMaterial({size: .13, color: 0xffdc91, transparent: true,
-      blending: THREE.AdditiveBlending, depthWrite: false});
-    const sparkCloud = new THREE.Points(sparkGeometry, sparkLight);
-    sparkCloud.visible = false;
-    sparkCloud.frustumCulled = false;
-    scene.add(sparkCloud);
-    const velocities = Array.from({length: sparkCount}, () => {
-      const angle = Math.random() * Math.PI * 2;
-      const speed = 1 + Math.random() * 4;
-      return [Math.cos(angle) * speed, Math.sin(angle) * speed, Math.random() - .5];
+  function buildEffect(THREE, texture, scene) {
+    const group = new THREE.Group();
+    group.visible = false;
+    scene.add(group);
+    const sparksGeometry = new THREE.BufferGeometry();
+    const sparks = new THREE.BufferAttribute(new Float32Array(particleCount * 3), 3);
+    sparksGeometry.setAttribute('position', sparks);
+    const cloud = new THREE.Points(sparksGeometry, new THREE.PointsMaterial({
+      map:texture, size:.24, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false,
+    }));
+    cloud.frustumCulled = false;
+    group.add(cloud);
+
+    const trailGeometry = new THREE.BufferGeometry();
+    const trace = new THREE.BufferAttribute(new Float32Array(51), 3);
+    trailGeometry.setAttribute('position', trace);
+    const trail = new THREE.Line(trailGeometry, new THREE.LineBasicMaterial({
+      transparent: true, blending: THREE.AdditiveBlending, depthWrite:false,
+    }));
+    trail.frustumCulled = false;
+    group.add(trail);
+
+    const radiant = new THREE.Sprite(new THREE.SpriteMaterial({
+      map:texture, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false,
+    }));
+    group.add(radiant);
+
+    const ringGeometry = new THREE.TorusGeometry(1, .024, 5, 44);
+    const rings = Array.from({length:3}, () => {
+      const object = new THREE.Mesh(ringGeometry, new THREE.MeshBasicMaterial({
+        transparent:true, opacity:0, depthWrite:false, blending:THREE.AdditiveBlending,
+      }));
+      group.add(object);
+      return object;
     });
-    let originX = 0;
-    let originY = 0;
-    let burstAt = -Infinity;
+    const skiff = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(.66, .105, .13), new THREE.MeshBasicMaterial({
+      color:0xf1b77b, transparent:true, depthWrite:false,
+    }));
+    body.rotation.z = -.09;
+    const sail = new THREE.Mesh(new THREE.CircleGeometry(.24, 3), new THREE.MeshBasicMaterial({
+      color:0xffe3a1, transparent:true, depthWrite:false,
+    }));
+    sail.position.set(.01, .167, .02);
+    sail.rotation.z = Math.PI / 2;
+    skiff.add(body, sail);
+    group.add(skiff);
+
+    const vectors = Array.from({length:particleCount}, () => {
+      const azimuth = Math.random() * Math.PI * 2;
+      const speed = .42 + Math.random() * 1.62;
+      return [Math.cos(azimuth) * speed, Math.sin(azimuth) * speed, Math.random() * .12];
+    });
+    const state = {group, beginAt:-Infinity};
+    const from = new THREE.Vector3();
+    const to = new THREE.Vector3();
+    const head = new THREE.Vector3();
+
+    function begin(event, colors, now) {
+      state.beginAt = now;
+      state.event = event;
+      state.recipe = event.type === 'cross' && event.detail.correct === false
+        ? {...recipes.cross, color:0xfa8c80, amount:8}
+        : recipes[event.type];
+      const tint = state.recipe.color || colors[0];
+      cloud.material.color.set(tint);
+      trail.material.color.set(event.type === 'ink' ? colors[2] : tint);
+      radiant.material.color.set(event.type === 'ink' ? colors[2] : colors[1]);
+      rings.forEach((object, index) => object.material.color.set(index % 2 ? colors[1] : tint));
+      group.visible = true;
+    }
+
+    function curve(progress, kind, output) {
+      output.lerpVectors(from, to, progress);
+      const span = Math.abs(from.x - to.x);
+      const arch = trajectory[kind] || 0;
+      output.y += Math.sin(progress * Math.PI) * (span * .21 + arch);
+      if (kind === 'ink' || kind === 'wind') output.x += Math.sin(progress * Math.PI * 2) * .1;
+    }
+
+    function draw(now, project) {
+      if (!group.visible) return;
+      const {recipe, event, beginAt} = state;
+      const age = Math.max(0, (now - beginAt) / (recipe.life * 1000));
+      if (age >= 1) {
+        group.visible = false;
+        return;
+      }
+      const fade = (1 - age) ** 1.22;
+      project(event.target, to, .52);
+      project(event.from, from, .52);
+      const travel = recipe.travel;
+      const headProgress = travel === 'link' ? easeOut(clamp(age * 2.8)) : easeOut(clamp(age * 1.24));
+      curve(headProgress, travel, head);
+
+      trail.visible = Boolean(travel);
+      if (travel) {
+        const tail = travel === 'link' ? 0 : Math.max(0, headProgress - .28);
+        for (let i = 0; i < trace.count; i++) {
+          curve(mix(tail, headProgress, i / (trace.count - 1)), travel, head);
+          trace.setXYZ(i, head.x, head.y, .3 + i * .004);
+        }
+        trace.needsUpdate = true;
+        trail.material.opacity = fade * .9;
+      }
+      radiant.visible = travel !== 'boat';
+      radiant.position.copy(travel ? head : to);
+      radiant.scale.setScalar((recipe.size || .76) * (1.1 + age));
+      radiant.material.opacity = fade * (travel ? .76 : .45);
+      skiff.visible = travel === 'boat';
+      if (skiff.visible) {
+        skiff.position.copy(head);
+        skiff.rotation.z = Math.sin(age * Math.PI * 2) * .09;
+        skiff.scale.setScalar(.72 + Math.sin(age * Math.PI) * .25);
+        skiff.children.forEach(part => { part.material.opacity = fade * .94; });
+      }
+
+      const bloomAge = travel ? clamp((age - .27) * 1.37) : age;
+      // Symmetric bursts expand the halo while the motes drift under gravity.
+      cloud.visible = Boolean(recipe.amount) && (!travel || age > .27);
+      if (cloud.visible) {
+        sparksGeometry.setDrawRange(0, recipe.amount);
+        const spread = (recipe.size || .73) * (bloomAge ** .53);
+        for (let i = 0; i < recipe.amount; i++) {
+          const [vx, vy, vz] = vectors[i];
+          const rise = event.type === 'complete' || event.type === 'reward' ? .8 : -.35;
+          sparks.setXYZ(i, to.x + vx * spread, to.y + vy * spread + spread * spread * rise, .61 + vz);
+        }
+        sparks.needsUpdate = true;
+        cloud.material.opacity = fade * .96;
+        cloud.material.size = Math.max(.1, .3 - bloomAge * .17);
+      }
+      rings.forEach((object, index) => {
+        const energy = (bloomAge - index * .105) * 1.31;
+        object.visible = index < (recipe.rings || 0) && energy > 0 && energy < 1;
+        if (object.visible) {
+          object.position.copy(to);
+          object.rotation.x = event.type === 'connect' || event.type === 'lantern' ? .94 : index * .17;
+          object.scale.setScalar(Math.max(.08, energy * (recipe.size || .73) * (1 + index * .27)));
+          object.material.opacity = Math.max(0, (1 - energy) * .8);
+        }
+      });
+    }
+
+    return {group, begin, draw, started:()=>state.beginAt};
+  }
+
+  function rendererFor(canvas, context, THREE, library, settings) {
+    const renderer = new THREE.WebGLRenderer({
+      canvas, context, alpha:true, antialias:true, powerPreference:'low-power', premultipliedAlpha:true,
+    });
+    renderer.autoClear = false;
+    renderer.setClearColor(0x000000, 0);
+    const camera = new THREE.OrthographicCamera(-5, 5, 5, -5, .1, 50);
+    camera.position.z = 24;
+    const background = new THREE.Scene();
+    const foreground = new THREE.Scene();
+    const texture = textureFor(THREE);
+    const effects = Array.from({length:maxEffects}, () => buildEffect(THREE, texture, foreground));
     let frame = 0;
+    let lastFrame = 0;
+    let previous = '';
+    let stage;
+    let startedAt = 0;
+    let actionTime = -Infinity;
+    let runningTime = 0;
+    let lane = 1;
+    let targetLane = 1;
+    let signal = .4;
+    let flight = 0;
+    let lastSize;
+    let stageRect;
+    let stageOnScreen = true;
+    let dirty = true;
+    let lost = false;
+    let pageVisible = true;
+
+    function project(point, out, z = 0) {
+      out.set(mix(camera.left, camera.right, point.x), mix(camera.top, camera.bottom, point.y), z);
+      return out;
+    }
+
+    function fit() {
+      const canvasRect = canvas.getBoundingClientRect();
+      const {width, height} = canvasRect;
+      if (!width || !height) return;
+      // Use the clipped content itself as the stage so the motif follows the app layout while scrolling.
+      const anchor = settings.anchor?.isConnected ? settings.anchor.getBoundingClientRect() : null;
+      const widthLimit = Math.min(width, 660);
+      const rect = anchor?.width && anchor.height ? anchor : {
+        left:canvasRect.left + (width - widthLimit) / 2, top:canvasRect.top, width:widthLimit, height,
+      };
+      stageRect = {x:rect.left - canvasRect.left, y:rect.top - canvasRect.top,
+        width:rect.width, height:Math.min(height, rect.height)};
+      if (!lastSize || lastSize.width !== width || lastSize.height !== height) {
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.4, Math.sqrt(950000 / (width * height))));
+        renderer.setSize(width, height, false);
+        camera.left = -(worldHeight / 2) * width / height;
+        camera.right = -camera.left;
+        camera.updateProjectionMatrix();
+        lastSize = {width,height};
+      }
+      dirty = false;
+    }
+
+    function clear() {
+      if (lost) return;
+      renderer.setScissorTest(false);
+      renderer.clear(true, true, true);
+    }
+
+    function redraw(now) {
+      if (dirty || now - startedAt < 720) fit();
+      if (!lastSize || !stage) return;
+      const dt = clamp((now - lastFrame) / 1000, 0, .05);
+      runningTime += dt;
+      lane = mix(lane, targetLane, Math.min(1, dt * 10));
+      clear();
+      const {width,height} = lastSize;
+      const {x,y,width:w,height:h} = stageRect;
+      const activity = clamp(1 - (now - actionTime) / 920) ** 2;
+      const left = clamp(x, 0, width);
+      const right = clamp(x + w, 0, width);
+      const top = clamp(y, 0, height);
+      const bottom = clamp(y + h, 0, height);
+      stageOnScreen = right > left && bottom > top;
+      if (stageOnScreen) {
+        const stageScale = worldHeight / height;
+        project({x:(x + w / 2) / width, y:(y + h / 2) / height}, stage.group.position);
+        stage.draw({ width:w * stageScale, height:h * stageScale, time:runningTime,
+          entrance:.72 + easeOut(clamp((now - startedAt) / 670)) * .28, activity, lane, signal, flight });
+        renderer.setScissor(left, height - bottom, right - left, bottom - top);
+        renderer.setScissorTest(true);
+        renderer.render(background, camera);
+        renderer.setScissorTest(false);
+      }
+      if (effects.some(effect => effect.group.visible)) {
+        for (const effect of effects) effect.draw(now, project);
+        renderer.clearDepth();
+        renderer.render(foreground, camera);
+      }
+      lastFrame = now;
+    }
+
+    function canAnimate() {
+      return !lost && pageVisible && !document.hidden && !settings.lowMotion && !settings.paused;
+    }
 
     function draw(now) {
-      if (!lowMotion && canvas.dataset.paused !== 'true') {
-        const time = now / 1000;
-        depth.rotation.z = Math.sin(time * .11) * .09;
-        depth.rotation.y = Math.cos(time * .17) * .32;
-        prisms.forEach((shape, index) => {
-          shape.rotation.x = time * (.21 + index * .03);
-          shape.rotation.y = time * .47 + index;
-        });
-        const age = (now - burstAt) / 1000;
-        sparkCloud.visible = age < .8;
-        if (sparkCloud.visible) {
-          sparkLight.opacity = 1 - age / .8;
-          velocities.forEach(([x, y, z], index) => sparkPositions.setXYZ(index,
-            originX + x * age, originY + y * age - age * age, z * age));
-          sparkPositions.needsUpdate = true;
+      frame = 0;
+      if (!canAnimate()) return;
+      const interval = now - actionTime < 1300 || now - startedAt < 730 ? 15 : 31;
+      if (now - lastFrame >= interval) redraw(now);
+      if (stageOnScreen || dirty || effects.some(effect => effect.group.visible)) {
+        frame = requestAnimationFrame(draw);
+      }
+    }
+
+    function invalidate() {
+      dirty = true;
+      if (canAnimate() && !frame) frame = requestAnimationFrame(draw);
+    }
+
+    const observeSize = typeof ResizeObserver === 'function' ? new ResizeObserver(invalidate) : null;
+    observeSize?.observe(canvas);
+    let observed;
+    function observeAnchor() {
+      if (observed === settings.anchor) return;
+      if (observed) observeSize?.unobserve(observed);
+      observed = settings.anchor;
+      if (observed?.isConnected) observeSize?.observe(observed);
+    }
+
+    function fire(event) {
+      if (!stage || !recipes[event.type] || !canAnimate()) return;
+      const now = performance.now();
+      actionTime = now;
+      if (finite(event.detail.lane)) targetLane = clamp(event.detail.lane, 0, 2);
+      if (finite(event.detail.signal)) signal = .37 + event.detail.signal * .31;
+      if (event.type === 'cross') flight = event.detail.correct === false ? -.46 : 1;
+      if (event.type === 'steer') return;
+      const candidate = effects.find(effect => !effect.group.visible) ||
+        effects.reduce((earliest, effect) => effect.started() < earliest.started() ? effect : earliest);
+      candidate.begin(event, stage.colors, now);
+      invalidate();
+    }
+
+    function sync() {
+      observeAnchor();
+      if (settings.name !== previous || !stage) {
+        const firstScene = !stage;
+        if (stage) {
+          releaseGroup(stage.group);
+          effects.forEach(effect => { effect.group.visible = false; });
+        }
+        stage = library.buildCinemaStage(THREE, texture, settings.name);
+        background.add(stage.group);
+        startedAt = performance.now();
+        previous = settings.name;
+        const startingLane = Number(settings.anchor?.dataset.lane);
+        targetLane = lane = finite(startingLane) ? clamp(startingLane, 0, 2) : 1;
+        signal = .4;
+        flight = 0;
+        if (!firstScene) {
+          fire(makeEvent(gameNames.has(previous) ? 'enterGame' : 'enter', settings.anchor, {}, canvas));
         }
       }
-      renderer.render(scene, camera);
-    }
-
-    function animate(now) {
-      draw(now);
-      frame = requestAnimationFrame(animate);
-    }
-
-    function resize() {
-      const bounds = canvas.parentElement?.getBoundingClientRect();
-      if (!bounds?.width || !bounds.height) return;
-      const horizontal = 3 * bounds.width / bounds.height;
-      camera.left = -horizontal;
-      camera.right = horizontal;
-      camera.updateProjectionMatrix();
-      renderer.setSize(bounds.width, bounds.height, false);
-      draw(performance.now());
-    }
-
-    function syncVisibility() {
-      cancelAnimationFrame(frame);
-      if (!document.hidden && !lowMotion && canvas.dataset.paused !== 'true') {
-        frame = requestAnimationFrame(animate);
+      if (!canAnimate()) {
+        cancelAnimationFrame(frame);
+        frame = 0;
+        if (settings.lowMotion) {
+          effects.forEach(effect => { effect.group.visible = false; });
+          clear();
+        }
+      } else {
+        lastFrame = performance.now() - 34;
+        invalidate();
       }
     }
 
-    function pulse(event) {
-      const {x, y} = event.detail || {};
-      if (lowMotion || !Number.isFinite(x) || !Number.isFinite(y)) return;
-      originX = camera.left + (camera.right - camera.left) * Math.max(0, Math.min(1, x));
-      originY = camera.top + (camera.bottom - camera.top) * Math.max(0, Math.min(1, y));
-      burstAt = performance.now();
+    function onPageHide() {
+      pageVisible = false;
+      sync();
     }
 
-    const observer = new ResizeObserver(resize);
-    observer.observe(canvas.parentElement);
-    const playback = new MutationObserver(syncVisibility);
-    playback.observe(canvas, {attributes: true, attributeFilter: ['data-paused']});
-    document.addEventListener('visibilitychange', syncVisibility);
-    canvas.addEventListener('hsk-arcade-pulse', pulse);
-    canvas.dataset.visual = '3d';
-    resize();
-    syncVisibility();
+    function onPageShow() {
+      pageVisible = true;
+      sync();
+    }
 
-    function lost() {
+    function onLost(event) {
+      event.preventDefault();
+      lost = true;
       canvas.dataset.visual = '2d';
-      cancelAnimationFrame(frame);
-      document.removeEventListener('visibilitychange', syncVisibility);
-      observer.disconnect();
-      playback.disconnect();
+      sync();
     }
-    canvas.addEventListener('webglcontextlost', lost);
-    return () => {
-      canvas.removeEventListener('webglcontextlost', lost);
-      canvas.removeEventListener('hsk-arcade-pulse', pulse);
-      lost();
-      stars.dispose();
-      starlight.dispose();
-      wire.dispose();
-      glimmer.dispose();
-      sparkGeometry.dispose();
-      sparkLight.dispose();
-      renderer.dispose();
+
+    function onRestored() {
+      lost = false;
+      lastSize = null;
+      canvas.dataset.visual = settings.lowMotion ? 'still' : '3d';
+      invalidate();
+    }
+
+    const listeners = new AbortController();
+    const options = {signal:listeners.signal, passive:true};
+    window.addEventListener('resize', invalidate, options);
+    window.addEventListener('scroll', invalidate, {...options,capture:true});
+    window.visualViewport?.addEventListener('resize', invalidate, options);
+    window.visualViewport?.addEventListener('scroll', invalidate, options);
+    window.addEventListener('pagehide', onPageHide, options);
+    window.addEventListener('pageshow', onPageShow, options);
+    document.addEventListener('visibilitychange', sync, options);
+    canvas.addEventListener('webglcontextlost', onLost, {signal:listeners.signal});
+    canvas.addEventListener('webglcontextrestored', onRestored, options);
+    sync();
+
+    return {
+      fire, sync,
+      get active() { return !lost; },
+      dispose() {
+        cancelAnimationFrame(frame);
+        listeners.abort();
+        observeSize?.disconnect();
+        releaseGroup(background);
+        releaseGroup(foreground);
+        texture.dispose();
+        renderer.dispose();
+      },
     };
   }
 
-  window.HSK_ARCADE_VISUAL = (canvas, lowMotion) => {
-    let disposed = false;
-    let cleanup;
-    canvas.dataset.visual = '2d';
-    const show = async () => {
-      try {
-        const THREE = await import(threeUrl);
-        if (disposed || !canvas.isConnected) return;
-        const context = canvas.getContext('webgl2', {alpha: true, antialias: true,
-          powerPreference: 'low-power'});
-        if (context) cleanup = start(canvas, THREE, lowMotion, context);
-      } catch {
-        // Decorative 3D can be unavailable on older devices.
+  function makeEvent(type, target, detail, canvas) {
+    const frame = canvas.getBoundingClientRect();
+    const pointFor = (element, x = .5, y = .5) => {
+      if (element && finite(element.x) && finite(element.y) && !element.getBoundingClientRect) {
+        return {x:clamp(element.x), y:clamp(element.y)};
       }
+      const rect = element?.isConnected ? element.getBoundingClientRect() : null;
+      return rect?.width && rect.height && frame.width && frame.height ? {
+        x:clamp((rect.left - frame.left + rect.width * x) / frame.width, .02, .98),
+        y:clamp((rect.top - frame.top + rect.height * y) / frame.height, .02, .98),
+      } : {x:.5, y:.42};
     };
-    void show();
-    return () => {
-      disposed = true;
-      cleanup?.();
+    const toward = pointFor(target, detail.toX ?? detail.x ?? .5, detail.toY ?? detail.y ?? .5);
+    const from = detail.from || finite(detail.fromX) || finite(detail.fromY)
+      ? pointFor(detail.from || target, detail.fromX ?? .5, detail.fromY ?? .5)
+      : {x:clamp(toward.x - (type === 'cross' ? .04 : .17), .03, .96),
+        y:clamp(toward.y + (type === 'cross' ? .31 : .17), .03, .96)};
+    return {type,target:toward,from,detail};
+  }
+
+  function mount(canvas) {
+    const settings = {name:'home', anchor:null, lowMotion:false, paused:false};
+    let display;
+    let disposed = false;
+    let initializing = false;
+    let unavailable = false;
+    let pending;
+    canvas.dataset.visual = '2d';
+
+    async function initialize() {
+      if (disposed || display || initializing || unavailable || settings.lowMotion) return;
+      initializing = true;
+      try {
+        const context = canvas.getContext('webgl2', {alpha:true, antialias:true, powerPreference:'low-power'});
+        if (!context) {
+          unavailable = true;
+          return;
+        }
+        const [THREE, library] = await loadModules();
+        if (disposed || !canvas.isConnected) return;
+        display = rendererFor(canvas, context, THREE, library, settings);
+        canvas.dataset.visual = settings.lowMotion ? 'still' : '3d';
+        if (pending && performance.now() - pending.time < 650) display.fire(pending.event);
+        pending = null;
+      } catch {
+        unavailable = true;
+      } finally {
+        initializing = false;
+      }
+    }
+
+    return {
+      setScene(name, {lowMotion = false, anchor = null} = {}) {
+        const changed = settings.name !== name || settings.anchor !== anchor;
+        if (settings.name !== name) {
+          delete canvas.dataset.cue;
+          pending = null;
+        }
+        settings.name = name;
+        settings.anchor = anchor;
+        settings.lowMotion = lowMotion;
+        if (changed) settings.paused = false;
+        canvas.dataset.scene = name;
+        canvas.dataset.visual = lowMotion ? 'still' : display?.active ? '3d' : '2d';
+        if (display) display.sync();
+        else if (!lowMotion) void initialize();
+      },
+      cue(type, target, detail = {}) {
+        if (type === 'pause') {
+          settings.paused = Boolean(detail.paused);
+          display?.sync();
+          return;
+        }
+        if (!recipes[type] || settings.lowMotion || settings.paused || disposed) return;
+        canvas.dataset.cue = type;
+        const event = makeEvent(type, target, detail, canvas);
+        if (display) display.fire(event);
+        else pending = {time:performance.now(), event};
+      },
+      dispose() {
+        disposed = true;
+        pending = null;
+        display?.dispose();
+        canvas.dataset.visual = '2d';
+      },
     };
-  };
+  }
+
+  window.HSK_CINEMA = {mount};
 })();

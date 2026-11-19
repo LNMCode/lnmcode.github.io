@@ -209,6 +209,27 @@ async function lights(page) {
   await page.locator('[data-lights-replay]').waitFor();
 }
 
+async function checkDoubleTap(page, context) {
+  assert.equal(await page.locator('#app').evaluate(el => getComputedStyle(el).touchAction), 'manipulation');
+  assert.equal(await page.locator('[data-action="begin-next"]').evaluate(el => getComputedStyle(el).touchAction),
+    'manipulation');
+  const heading = await page.locator('.hero h1').boundingBox();
+  const point = {x:heading.x + heading.width / 2, y:heading.y + heading.height / 2};
+  const cdp = await context.newCDPSession(page);
+  const initial = await page.evaluate(() => visualViewport.scale);
+  try {
+    for (let tap = 0; tap < 2; tap++) {
+      await cdp.send('Input.dispatchTouchEvent', {type:'touchStart', touchPoints:[point]});
+      await cdp.send('Input.dispatchTouchEvent', {type:'touchEnd', touchPoints:[]});
+    }
+    await new Promise(resolve => setTimeout(resolve, 400));
+    const after = await page.evaluate(() => visualViewport.scale);
+    assert.ok(Math.abs(after - initial) < 0.01, `Double tap changed zoom from ${initial} to ${after}`);
+  } finally {
+    await cdp.detach();
+  }
+}
+
 async function run() {
   const browser = await chromium.launch({
     channel: process.env.HSK_CHROMIUM_CHANNEL || 'chrome',
@@ -225,6 +246,14 @@ async function run() {
     page.on('pageerror', error => errors.push(error.message));
     await page.goto(url);
     await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller));
+    const canvas = page.locator('#hsk-cinema');
+    const webgl = await page.evaluate(() => Boolean(document.createElement('canvas').getContext('webgl2')));
+    if (webgl) await page.locator('#hsk-cinema[data-visual="3d"][data-scene="home"]').waitFor({state:'attached'});
+    await checkDoubleTap(page, context);
+    await page.emulateMedia({reducedMotion:'reduce'});
+    await page.locator('#hsk-cinema[data-visual="still"]').waitFor({state:'attached'});
+    await page.emulateMedia({reducedMotion:'no-preference'});
+    if (webgl) await page.locator('#hsk-cinema[data-visual="3d"]').waitFor({state:'attached'});
     const lobby = () => page.getByRole('button', { name: 'Sân chơi', exact: true }).click();
     const enter = game => page.locator(`[data-action="arcade-start"][data-id="${game}"]`).click();
     await lobby();
@@ -235,9 +264,10 @@ async function run() {
     for (const [name, play] of Object.entries({wind, echo, riddle, lights, pinyin, strokes, pairs, flow})) {
       await enter(name);
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
+      assert.equal(await canvas.getAttribute('data-scene'), name);
+      assert.equal(await page.locator('#app canvas').count(), 0);
       if (name === 'pinyin') {
-        const webgl = await page.evaluate(() => Boolean(document.createElement('canvas').getContext('webgl2')));
-        if (webgl) await page.locator('[data-pinyin-canvas][data-visual="3d"]').waitFor({state:'attached'});
+        if (webgl) await page.locator('#hsk-cinema[data-visual="3d"]').waitFor({state:'attached'});
         if (process.env.HSK_ARCADE_SCREENSHOTS) {
           await page.locator('.arcade-main').screenshot({path: process.env.HSK_ARCADE_SCREENSHOTS + '/hsk1-sao-pinyin.png'});
         }
@@ -246,6 +276,7 @@ async function run() {
         await page.locator('.arcade-main').screenshot({path: process.env.HSK_ARCADE_SCREENSHOTS + '/hsk1-ho-dom-dom.png'});
       }
       await play(page);
+      if (webgl) assert.ok(await canvas.getAttribute('data-cue'), `Thiếu phản hồi 3D cho ${name}`);
       await lobby();
       assert.match(await page.locator(`.arcade-card-${name}`).innerText(), /Kỷ lục \d+/);
     }
@@ -276,7 +307,7 @@ async function run() {
     await fallbackPage.goto(url);
     await fallbackPage.getByRole('button', {name:'Sân chơi', exact:true}).click();
     await fallbackPage.locator('[data-action="arcade-start"][data-id="pinyin"]').click();
-    await fallbackPage.locator('[data-pinyin-canvas][data-visual="2d"]').waitFor({state:'attached'});
+    await fallbackPage.locator('#hsk-cinema[data-visual="2d"]').waitFor({state:'attached'});
     const target = fallbackPage.locator('[data-pinyin-target][aria-pressed="true"]');
     const id = await target.getAttribute('data-pinyin-target');
     const reading = await fallbackPage.evaluate(wordId => window.HSK_ENGINE.W[wordId].pinyin, id);
@@ -284,7 +315,7 @@ async function run() {
     await fallbackPage.locator('[data-pinyin-launch]').click();
     await fallbackPage.waitForFunction(() => Number(document.querySelector('[data-pinyin-score]').textContent) > 0);
     await fallback.close();
-    console.log('Đạt kiểm thử Chromium cho tám mini game, kỷ lục, ngoại tuyến và chế độ 2D khi WebGL không khả dụng.');
+    console.log('Đạt kiểm thử Chromium cho tám trò, hiệu ứng 3D, giảm chuyển động, ngoại tuyến và chạm đôi.');
   } finally {
     await browser.close();
   }

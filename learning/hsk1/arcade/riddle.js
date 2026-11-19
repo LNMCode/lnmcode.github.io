@@ -47,7 +47,7 @@
     root.innerHTML = `
       <section class="riddle-game${ctx.lowMotion ? ' riddle-still' : ''}" data-riddle-riddle aria-label="Mật Mã Âm Tiết">
         <div class="riddle-hud"><span>Khóa <b data-riddle-round></b></span><span><b data-riddle-score>0</b> điểm</span></div>
-        <div class="riddle-vault" data-riddle-lock>
+        <div class="riddle-vault" data-riddle-lock data-cinema-stage>
           <div class="riddle-plate">
             <div class="riddle-ring riddle-ring-outer" aria-hidden="true"></div>
             <div class="riddle-ring riddle-ring-middle" aria-hidden="true"></div>
@@ -180,6 +180,7 @@
       hints++;
       dials[part].select.value = round[part];
       setDial(part, 'hint');
+      ctx.motion?.('dial', lock, {part, value: dials[part].select.selectedIndex});
       const next = PARTS.find(name => !dials[name].select.disabled);
       hintButton.disabled = !next;
       message.textContent = 'Đã mở một vòng. Dùng phần được gợi ý để thử mật mã.';
@@ -209,6 +210,7 @@
         message.textContent = missed.length
           ? `Còn ${missed.length} vòng chưa khớp. Các vòng đúng đã được giữ lại.`
           : 'Mật mã chưa hợp lệ. Chọn lại một vòng rồi thử tiếp.';
+        ctx.motion?.('miss', lock);
         if (missed.length) dials[missed[0]].select.focus();
         return;
       }
@@ -224,13 +226,16 @@
       updateScore();
       message.textContent = `${round.word.hanzi} · ${round.word.pinyin}. ${final ? `Đã mở cả kho. Tổng ${score} điểm.` : `Khóa đã mở. +${points} điểm.`}`;
       ctx.grade(round.word.id, 'reading', mistakes || hints ? 'almost' : 'good');
+      ctx.motion?.('unlock', lock, {score, final});
       if (final) ctx.complete(score);
       (final ? replayButton : nextButton).focus({preventScroll: true});
     }
 
     function change(event) {
       const part = event.target.dataset.riddlePart;
-      if (part) setDial(part, '');
+      if (!part) return;
+      setDial(part, '');
+      ctx.motion?.('dial', lock, {part, value: event.target.selectedIndex});
     }
 
     function nextRound() {

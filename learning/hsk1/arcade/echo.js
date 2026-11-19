@@ -16,7 +16,7 @@
             <span class="echo-dial-value"><strong data-echo-frequency-value></strong> MHz</span>
             <span class="echo-lamp" data-echo-lock>Đang tìm sóng</span>
           </div>
-          <div class="echo-scope" aria-hidden="true">
+          <div class="echo-scope" data-cinema-stage aria-hidden="true">
             ${bars.map((height, index) => `<i style="--bar:${height}%;--beat:${(index % 7) * -.11}s"></i>`).join('')}
           </div>
           <div class="echo-bands" role="group" aria-label="Chọn tần số">
@@ -59,6 +59,7 @@
 
     const get = name => root.querySelector(`[data-echo-${name}]`);
     const radio = root.querySelector('.echo-radio');
+    const spectrum = radio.querySelector('.echo-scope');
     const bandButtons = [...root.querySelectorAll('[data-echo-frequency]')];
     const audio = get('audio');
     const input = get('input');
@@ -112,6 +113,7 @@
     function refreshDial() {
       const distance = Math.abs(dial - frequency);
       radio.dataset.signal = distance === 0 ? '3' : distance === 1 ? '2' : '1';
+      spectrum.dataset.signal = radio.dataset.signal;
       get('frequency-value').textContent = frequencies[dial];
       get('lock').textContent = distance === 0 ? 'Đã bắt sóng' : distance === 1 ? 'Sóng gần' : 'Sóng yếu';
       bandButtons.forEach((button, band) => {
@@ -125,6 +127,7 @@
       dial = band;
       tuned = dial === frequency;
       refreshDial();
+      ctx.motion?.('tune', spectrum, {signal: Number(radio.dataset.signal), band});
       if (!tuned) {
         prompt(Math.abs(dial - frequency) === 1
           ? 'Sóng mạnh hơn. Thử một tần số liền kề.'
@@ -163,6 +166,7 @@
       get('clue').hidden = false;
       get('hint').hidden = true;
       get('meaning').textContent = words[index].vi;
+      if (!offline) ctx.motion?.('hint', get('clue'));
       get('note').textContent = offline
         ? 'Không có giọng Quan thoại khả dụng. Lượt này luyện nhớ cách đọc từ nghĩa.'
         : 'Lượt có manh mối không tính vào số tín hiệu giải bằng tai.';
@@ -186,6 +190,7 @@
         return;
       }
       spoken = heard = true;
+      ctx.motion?.('listen', spectrum);
       audio.textContent = 'Nghe lại';
       get('form').hidden = false;
       radio.classList.add('is-speaking');
@@ -204,6 +209,7 @@
       }
       states[index] = correct ? 'linked' : 'recovered';
       drawRoute();
+      ctx.motion?.(correct ? 'success' : 'miss', spectrum);
       get('actions').hidden = true;
       get('clue').hidden = true;
       get('form').hidden = true;
@@ -224,6 +230,7 @@
       else if (match === 'empty') prompt('Nhập âm đọc vào ô giải mã.');
       else {
         missed = true;
+        ctx.motion?.('miss', input);
         prompt(match === 'almost' ? 'Âm đã khớp. Hãy kiểm tra dấu hoặc số thanh.'
           : hinted ? 'Pinyin chưa khớp. Thử nhớ âm đọc hoặc xem lời giải.'
           : 'Pinyin chưa khớp. Thử lại hoặc nghe thêm một lần.');
@@ -245,6 +252,7 @@
       status.hidden = true;
       get('result').hidden = false;
       get('summary').textContent = `Đã giải ${decoded}/${words.length} tín hiệu, ${byEar} tín hiệu bằng tai. Tổng ${score} điểm.`;
+      if (decoded > 0) ctx.motion?.('reward', spectrum, {score});
       ctx.complete(score);
       get('result').querySelector('h2').focus({preventScroll: true});
     }

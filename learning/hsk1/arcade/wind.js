@@ -42,7 +42,7 @@
             <span data-wind-clue-kind></span>
             <strong data-wind-clue></strong>
           </div>
-          <div class="wind-stage" data-wind-stage aria-label="Đường bay ba làn">
+          <div class="wind-stage" data-wind-stage data-cinema-stage aria-label="Đường bay ba làn">
             <i class="wind-ridges" aria-hidden="true"></i>
             <div class="wind-doors" role="group" aria-label="Chọn làn cửa chữ">
               ${laneNames.map((_, lane) => '<button type="button" data-wind-lane="' + lane + '"><span lang="zh-Hans"></span></button>').join('')}
@@ -124,6 +124,7 @@
 
     function updateSteering() {
       stage.style.setProperty('--kite-x', lanePosition(lane));
+      stage.dataset.lane = String(lane);
       stage.classList.toggle('has-draft', charged);
       gates.forEach((gate, index) => gate.setAttribute('aria-pressed', String(index === lane)));
       steers[0].disabled = crossing || lane === 0;
@@ -134,8 +135,10 @@
     function move(index) {
       if (crossing || finished || index < 0 || index >= route[round].gates.length || index === lane) return;
       lane = index;
+      ctx.motion?.('steer', stage, {lane});
       if (lane === draftLane && !charged) {
         charged = true;
+        ctx.motion?.('gust', ribbon);
         ribbon.hidden = true;
         setStatus('Diều đã đón gió. Bay vào cửa đúng để nhận thêm 30 điểm.');
       }
@@ -223,6 +226,7 @@
       if (!review) visited[round] = correct ? 'lit' : 'missed';
       if (review && correct) visited[current.revisits] = 'retried';
       ctx.grade(current.word.id, 'hanzi', correct ? review ? 'almost' : 'good' : 'again');
+      ctx.motion?.('cross', gates[lane], {lane, correct, charged});
       updateScore();
       updateRoute();
       updateSteering();
@@ -245,6 +249,7 @@
       replay.hidden = false;
       roundLabel.textContent = 'Đã về bến';
       setStatus(`Diều đã về bến. Bạn qua đúng ${hits}/${route.length} cửa và ghi ${score} điểm.`, 'good');
+      if (hits > 0) ctx.motion?.('reward', status, {score});
       ctx.complete(score);
       if (eventDrivenKeyboard) replay.focus({preventScroll:true});
     }

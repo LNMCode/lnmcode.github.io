@@ -1,0 +1,106 @@
+html, body, #app, #hsk1-update,
+#app :where(button, a, input, select, textarea, summary) {
+  touch-action: manipulation;
+}
+
+#hsk-cinema {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 27;
+  display: block;
+  pointer-events: none;
+}
+
+#hsk-cinema[data-visual="2d"], #hsk-cinema[data-visual="still"] {
+  visibility: hidden;
+}
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  border-color: #56616a;
+  background: linear-gradient(145deg, #1b2b3b, #131d29 70%);
+}
+
+.hero > .scene {
+  order: -1;
+  isolation: isolate;
+  min-height: clamp(210px, 59vw, 310px);
+  border-radius: 0;
+  border-bottom: 1px solid #35495b;
+  box-shadow: inset 0 -45px 54px -31px #071320;
+}
+
+.hero .scene-caption {
+  bottom: 10px;
+  left: 12px;
+  padding: 5px 9px;
+  border-color: #7a6755;
+  border-radius: 9px;
+  background: #151c27db;
+  color: #ffe4b5;
+}
+
+.hero-body {
+  position: relative;
+  padding-top: 14px;
+  padding-bottom: 15px;
+}
+
+.hero h1 {
+  color: #fff0d5;
+  text-wrap: balance;
+}
+
+.arcade-lobby-title {
+  isolation: isolate;
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 16px;
+  padding: 23px 15px;
+  border: 1px solid #6a5947;
+  border-radius: 19px;
+  background: radial-gradient(ellipse at 85% 6%, #5b3b2a 0%, #283044 50%, #172434 75%);
+}
+
+.arcade-lobby-title h1 {
+  color: #fff1d8;
+  text-wrap: balance;
+}
+
+.arcade-game-header {
+  border-bottom: 1px solid #334559;
+  margin-bottom: 14px;
+}
+
+.arcade-home-link:active,
+.arcade-card:active {
+  transform: translateY(1px);
+}
+
+.cinema-scene-entry {
+  animation: cinema-arrive .42s cubic-bezier(.18,.68,.2,1);
+}
+
+.cinema-scene-entry > :is(.hero, .arcade-lobby, .adventure-panel, .adventure-gate, .quest-screen, #arcade-game) {
+  animation: cinema-stage-arrive .48s cubic-bezier(.24,.75,.26,1);
+}
+
+@keyframes cinema-arrive {
+  from { opacity: .77; }
+  to { opacity: 1; }
+}
+
+@keyframes cinema-stage-arrive {
+  from { transform: translateY(10px) scale(.987); }
+  to { transform: translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cinema-scene-entry,
+  .cinema-scene-entry > * {
+    animation: none;
+  }
+}

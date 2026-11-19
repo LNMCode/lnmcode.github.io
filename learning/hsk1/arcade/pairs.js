@@ -36,7 +36,7 @@
           </div>
         </div>
         <div class="memory-game-score"></div>
-        <div class="pair-grid" role="group" aria-label="Bàn lật đèn"></div>
+        <div class="pair-grid" data-cinema-stage role="group" aria-label="Bàn lật đèn"></div>
         <p class="memory-game-status" role="status" aria-live="polite"></p>
         <div class="memory-game-actions pair-controls"></div>
       </section>`;
@@ -138,21 +138,26 @@
       const card = cards[index];
       if (!card || open.includes(index) || paired.has(card.word.id) || status === 'missed') return;
       open.push(index);
+      const target = board.children[index];
       if (open.length === 1) {
         message = card.side === 'hanzi' ? 'Tìm đèn có nghĩa của chữ này.' : 'Tìm đèn có chữ Hán tương ứng.';
         update();
+        ctx.motion?.('flip', target);
         return;
       }
       moves++;
       const first = cards[open[0]];
+      const from = board.children[open[0]];
       if (first.word.id === card.word.id) {
         paired.add(card.word.id);
         open = [];
         message = `${card.word.hanzi} · ${card.word.pinyin} · ${card.word.vi}. Cặp đèn đã sáng.`;
         update();
+        ctx.motion?.('match', target, {from});
         ctx.grade(card.word.id, 'meaning', 'good');
         if (paired.size === cards.length / 2) {
           controls.querySelector('[data-pairs-replay]').focus({preventScroll:true});
+          ctx.motion?.('reward', board);
           ctx.complete(score());
         }
         return;
@@ -160,6 +165,7 @@
       status = 'missed';
       message = 'Hai đèn chưa thành cặp. Nhìn kỹ trước khi úp lại.';
       update();
+      ctx.motion?.('miss', target, {from});
       timer = window.setTimeout(closeMissed, 2200);
     }
 

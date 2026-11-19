@@ -117,6 +117,8 @@
   animation: echo-spectrum .57s ease-in-out var(--beat) alternate infinite;
 }
 
+body:has(#hsk-cinema[data-visual="3d"]) .echo-radio .echo-scope i { opacity: .32; }
+
 .echo-bands {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));

@@ -200,6 +200,15 @@
   filter: drop-shadow(0 0 7px #eec6fc66);
 }
 
+.ink-board--wet .ink-history path:last-child {
+  animation: ink-set .54s ease-out both;
+}
+
+@keyframes ink-set {
+  from { fill: #e5fffa; filter: drop-shadow(0 0 15px #adf8e8); }
+  to { fill: #f4d5f5; filter: none; }
+}
+
 .ink-guide {
   fill: none;
   stroke: #a9dce6;
@@ -268,7 +277,11 @@
   animation: none;
   box-shadow: 0 0 10px #7bdfd166;
 }
+.ink-game--still .ink-board--wet .ink-history path:last-child {
+  animation: none;
+}
 
 @media (prefers-reduced-motion: reduce) {
-  .ink-board--sealed { animation: none; }
+  .ink-board--sealed,
+  .ink-board--wet .ink-history path:last-child { animation: none; }
 }

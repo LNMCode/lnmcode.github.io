@@ -87,7 +87,7 @@
     const ended = !drawing;
     const history = glyph.outlines.slice(0, stroke).map(path => `<path d="${esc(path)}"></path>`).join('');
     const outline = showModel && !ended ? glyph.outlines.map(path => `<path d="${esc(path)}"></path>`).join('') : '';
-    return `<svg class="ink-board${burst ? ' ink-board--sealed' : ''}" data-stroke-board data-stroke-count="${stroke}"
+    return `<svg class="ink-board${burst ? ' ink-board--sealed' : ''}" data-cinema-stage data-stroke-board data-stroke-count="${stroke}"
       viewBox="0 0 1024 1024" role="img" aria-label="Ô viết chữ Hán, kéo một nét từ đầu tới cuối"
       preserveAspectRatio="none" focusable="false">
       <path class="ink-grid" d="M0 512H1024M512 0V1024M0 0L1024 1024M1024 0L0 1024"></path>
@@ -153,10 +153,10 @@
           <h2 id="ink-game-title" data-stroke-title tabindex="-1">${title}</h2>
         </div><div class="ink-seals" aria-label="Các dấu đã khắc">${seals}</div></header>
         ${phase === 'intro' ? `<p class="ink-intro">Kéo từng nét đúng thứ tự để khắc ${selected.length} dấu chữ. Sau khi thấy mẫu, thử tự viết lại từ nghĩa và Pinyin.</p>
-          <div class="ink-cover" aria-hidden="true">${selected.map(item => `<span lang="zh-Hans">${esc(item.hanzi)}</span>`).join('')}</div>
+          <div class="ink-cover" data-cinema-stage aria-hidden="true">${selected.map(item => `<span lang="zh-Hans">${esc(item.hanzi)}</span>`).join('')}</div>
           <button type="button" class="btn primary full" data-stroke-action="start" data-stroke-start>Bắt đầu viết</button>
           <p class="ink-attribution">Bộ 30 chữ HSK 1 dùng dữ liệu từ Make Me a Hanzi và Hanzi Writer Data. <a href="./arcade/ARPHICPL.TXT" target="_blank" rel="noopener">Giấy phép Arphic</a>.</p>`
-          : phase === 'finished' ? `<div class="ink-cover ink-cover--reward">${selected.map(item => `<span lang="zh-Hans">${esc(item.hanzi)}</span>`).join('')}</div>
+          : phase === 'finished' ? `<div class="ink-cover ink-cover--reward" data-cinema-stage>${selected.map(item => `<span lang="zh-Hans">${esc(item.hanzi)}</span>`).join('')}</div>
           <p class="ink-score"><strong>${totalScore}</strong> điểm</p>
           <div class="ink-controls"><button type="button" class="btn primary" data-stroke-action="replay" data-stroke-replay>Chơi lại</button>
           <button type="button" class="btn button-soft" data-stroke-action="exit">Về sân chơi</button></div>`
@@ -190,11 +190,13 @@
         phase = 'finished';
         render();
         focusHeading();
+        ctx.motion?.('reward', root.querySelector('.ink-cover--reward'));
         ctx.complete(totalScore);
         return;
       }
       position += 1;
       enterDrawing('guide');
+      ctx.motion?.('collect', root.querySelectorAll('.ink-seal--lit')[position - 1]);
     }
 
     function enterDrawing(next) {
@@ -219,6 +221,9 @@
         hadHint = true;
         note = 'Điểm sáng là nơi bắt đầu nét.';
         render();
+        const [start] = data[selected[position].hanzi].medians[stroke];
+        const board = root.querySelector('[data-stroke-board]');
+        ctx.motion?.('hint', board, {x: start[0] / 1024, y: start[1] / 1024});
       }
       if (action === 'next' && ['ready', 'done', 'recall'].includes(phase)) advance();
       if (action === 'replay' && phase === 'finished') {
@@ -277,6 +282,19 @@
         if (stroke === glyph.medians.length) finishCharacter();
       }
       render();
+      const board = root.querySelector('[data-stroke-board]');
+      const ink = {x: last[0] / 1024, y: last[1] / 1024};
+      if (outcome !== 'good') {
+        ctx.motion?.('miss', board, ink);
+        return;
+      }
+      const [firstX, firstY] = trace.points[0];
+      const bounds = board.getBoundingClientRect();
+      const from = {x: (bounds.left + firstX / 1024 * bounds.width) / window.innerWidth,
+        y: (bounds.top + firstY / 1024 * bounds.height) / window.innerHeight};
+      board.classList.add('ink-board--wet');
+      ctx.motion?.('ink', board, {...ink, from});
+      if (effect) ctx.motion?.('seal', board);
     }
 
     root.addEventListener('click', click);
