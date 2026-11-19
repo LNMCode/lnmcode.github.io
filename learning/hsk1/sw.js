@@ -1,6 +1,6 @@
 const SCOPE = self.registration.scope;
 const CACHE_PREFIX = `han-ngu-hsk1:${SCOPE}:`;
-const VERSION = 'local-v7'; // Replaced with the commit SHA in the Pages artifact.
+const VERSION = 'local-v8'; // Replaced with the commit SHA in the Pages artifact.
 const CACHE = CACHE_PREFIX + VERSION;
 const APP_SHELL = new URL('index.html', SCOPE).href;
 const CORE = new Set([
@@ -10,6 +10,8 @@ const CORE = new Set([
   'arcade/arcade.css', 'arcade/pinyin.css', 'arcade/strokes.css', 'arcade/memory-games.css',
   'arcade/catalog.js', 'arcade/visual.js', 'arcade/strokes-data.js', 'arcade/pinyin.js',
   'arcade/strokes.js', 'arcade/pairs.js', 'arcade/flow.js',
+  'arcade/wind.js', 'arcade/echo.js', 'arcade/riddle.js', 'arcade/lights.js',
+  'arcade/wind.css', 'arcade/echo.css', 'arcade/riddle.css', 'arcade/lights.css',
   'arcade/ARPHICPL.TXT', 'arcade/vendor/THREE-LICENSE.txt',
   'arcade/vendor/three.module.min.js', 'arcade/vendor/three.core.min.js'
 ].map(path => new URL(path, SCOPE).href));

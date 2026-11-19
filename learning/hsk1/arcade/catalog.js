@@ -2,6 +2,22 @@
   'use strict';
 
   const games = Object.freeze({
+    wind: {
+      name: 'Đường Gió', glyph: '风', ability: 'Nhận diện từ',
+      description: 'Lái diều qua những cổng chữ dọc đường đêm.',
+    },
+    echo: {
+      name: 'Trạm Vọng Âm', glyph: '声', ability: 'Nghe và ghi Pinyin',
+      description: 'Bắt sóng Quan thoại và gõ lại để nối các trạm.',
+    },
+    riddle: {
+      name: 'Mật Mã Âm Tiết', glyph: '锁', ability: 'Âm đầu, vần và thanh',
+      description: 'Chỉnh ba vòng âm để mở khóa bằng Pinyin.',
+    },
+    lights: {
+      name: 'Hồ Đom Đóm', glyph: '萤', ability: 'Gọi lại từ theo nghĩa',
+      description: 'Thắp hai chữ theo thứ tự để bắc một vệt sáng qua hồ.',
+    },
     pinyin: {
       name: 'Sao Pinyin', glyph: '音', ability: 'Phát âm và thanh điệu',
       description: 'Ngắm các ngôi sao chữ Hán, gõ Pinyin để phóng luồng sáng.',

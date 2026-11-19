@@ -8,13 +8,14 @@ const { appRoot, loadGame } = require('./helpers.cjs');
 function loadArcadeParts() {
   const window = {};
   const context = vm.createContext({ window });
-  for (const file of ['catalog.js', 'strokes-data.js', 'pinyin.js', 'strokes.js', 'pairs.js', 'flow.js']) {
+  for (const file of ['catalog.js', 'strokes-data.js', 'pinyin.js', 'strokes.js', 'pairs.js', 'flow.js',
+    'wind.js', 'echo.js', 'riddle.js', 'lights.js']) {
     vm.runInContext(readFileSync(path.join(appRoot, 'arcade', file), 'utf8'), context, { filename: file });
   }
   return window;
 }
 
-test('bốn mini game đã đăng ký, ưu tiên từ đã gặp và có nội dung cho người mới', () => {
+test('tám mini game đã đăng ký, ưu tiên từ đã gặp và có nội dung cho người mới', () => {
   const { engine } = loadGame();
   const { HSK_ARCADE, HSK_MINIGAMES } = loadArcadeParts();
   assert.deepEqual(Object.keys(HSK_MINIGAMES).sort(), Object.keys(HSK_ARCADE.games).sort());
@@ -54,13 +55,15 @@ test('kỷ lục mini game giữ trong bản sao lưu mà không thay chặng ph
   state.active = { mode: 'mission', missionId: mission.id, queue: engine.adventureQueue(state, mission), index: 0, intro: true };
   engine.recordArcade(state, 'flow', 200);
   engine.recordArcade(state, 'flow', 170);
+  for (const id of ['wind', 'echo', 'riddle', 'lights']) engine.recordArcade(state, id, 130);
   engine.recordArcade(state, 'unknown', 300);
   engine.recordArcade(state, 'pairs', NaN);
   const saved = engine.load();
   assert.equal(saved.arcade.flow.played, 2);
   assert.equal(saved.arcade.flow.best, 200);
   assert.equal(saved.arcade.flow.last, 170);
-  assert.equal(Object.keys(saved.arcade).length, 1);
+  assert.equal(Object.keys(saved.arcade).length, 5);
+  for (const id of ['wind', 'echo', 'riddle', 'lights']) assert.equal(saved.arcade[id].best, 130);
   assert.equal(saved.active.missionId, mission.id);
   assert.equal(saved.active.queue[0].type, 'trail');
   assert.equal(Object.keys(engine.normalize({ ...state, arcade: undefined }).arcade).length, 0);

@@ -97,6 +97,118 @@ async function flow(page) {
   }
 }
 
+async function wind(page) {
+  let triedWrong = false;
+  let checkpoints = 0;
+  while (!(await page.locator('[data-wind-replay]').isVisible()) && checkpoints < 8) {
+    const clue = await page.locator('[data-wind-clue]').textContent();
+    const reading = (await page.locator('[data-wind-clue-kind]').textContent()).includes('Pinyin');
+    const ids = await page.locator('[data-wind-lane]').evaluateAll(lanes => lanes.map(lane => lane.dataset.word));
+    const answer = await page.evaluate(({ids, clue, reading}) =>
+      ids.find(id => window.HSK_ENGINE.W[id]?.[reading ? 'pinyin' : 'vi'] === clue), {ids, clue, reading});
+    assert.ok(answer);
+    const choice = triedWrong ? answer : ids.find(id => id && id !== answer);
+    await page.locator(`[data-wind-lane][data-word="${choice}"]`).click();
+    await page.locator('[data-wind-cross]').click();
+    assert.equal(await page.locator('[data-wind-stage]').getAttribute('data-flight'), triedWrong ? 'pass' : 'miss');
+    triedWrong = true;
+    checkpoints++;
+    await page.locator('[data-wind-next]').click();
+  }
+  assert.equal(checkpoints, 7);
+  await page.locator('[data-wind-replay]').waitFor();
+}
+
+async function echo(page) {
+  for (let round = 0; round < 5; round++) {
+    for (const band of await page.locator('[data-echo-frequency]').all()) {
+      await band.click();
+      if (await page.locator('.echo-radio').getAttribute('data-signal') === '3') break;
+    }
+    const meaning = page.locator('[data-echo-meaning]');
+    await meaning.waitFor();
+    const clue = await meaning.textContent();
+    const readings = await page.evaluate(value =>
+      window.HSK_ENGINE.D.words.filter(word => word.vi === value).map(word => word.pinyin), clue);
+    const input = page.locator('[data-echo-input]');
+    for (const reading of readings) {
+      await input.fill(reading);
+      await input.press('Enter');
+      if (await page.locator('[data-echo-answer]').isVisible()) break;
+    }
+    await page.locator('[data-echo-next]').click();
+  }
+  await page.locator('[data-echo-replay]').waitFor();
+}
+
+async function riddle(page) {
+  for (let round = 0; round < 5; round++) {
+    const glyph = await page.locator('[data-riddle-word]').textContent();
+    const answer = await page.evaluate(hanzi => {
+      const options = part => [...document.querySelector(`[data-riddle-part="${part}"]`).options]
+        .map(option => option.value).filter(Boolean);
+      const engine = window.HSK_ENGINE;
+      const word = engine.D.words.find(item => item.hanzi === hanzi);
+      for (const onset of options('onset')) {
+        for (const rime of options('rime')) {
+          for (const tone of options('tone')) {
+            if (engine.matchPinyin((onset === '∅' ? '' : onset) + rime + tone, word) === 'good') {
+              return {onset, rime, tone};
+            }
+          }
+        }
+      }
+    }, glyph);
+    assert.ok(answer);
+    if (round === 0) {
+      await page.locator('[data-riddle-part="onset"]').selectOption(answer.onset);
+      await page.locator('[data-riddle-part="rime"]').selectOption(answer.rime);
+      await page.locator('[data-riddle-part="tone"]').selectOption(answer.tone === '1' ? '2' : '1');
+      await page.locator('[data-riddle-try]').click();
+      await page.locator('[data-riddle-dial="tone"][data-state="missed"]').waitFor();
+      await page.locator('[data-riddle-hint]').click();
+    } else {
+      for (const [part, value] of Object.entries(answer)) {
+        await page.locator(`[data-riddle-part="${part}"]`).selectOption(value);
+      }
+    }
+    await page.locator('[data-riddle-try]').click();
+    await page.locator('[data-riddle-lock].is-open').waitFor();
+    if (round < 4) await page.locator('[data-riddle-next]').click();
+  }
+  await page.locator('[data-riddle-replay]').waitFor();
+}
+
+async function lights(page) {
+  const mode = page.locator('[data-lights-mode]');
+  const pause = page.locator('[data-lights-pause]');
+  await mode.click();
+  await pause.click();
+  assert.equal(await page.locator('[data-lights-lake]').getAttribute('data-paused'), '');
+  await pause.click();
+  await mode.click();
+  for (let round = 0; round < 5; round++) {
+    const board = page.locator('[data-lights-lake]');
+    for (let step = 0; step < 2; step++) {
+      const clue = await page.locator('.lights-clues [aria-current="step"]').textContent();
+      const ids = await board.locator('[data-lights-word]').evaluateAll(pads => pads.map(pad => pad.dataset.lightsWord));
+      const target = await page.evaluate(({ids, clue}) =>
+        ids.find(id => window.HSK_ENGINE.W[id].vi === clue), {ids, clue});
+      assert.ok(target);
+      if (round === 0 && step === 0) {
+        const wrong = ids.find(id => id !== target);
+        await board.locator(`[data-lights-word="${wrong}"]`).click();
+        await page.locator('[data-lights-hint]').click();
+        assert.equal(await board.locator('.is-hinted').getAttribute('data-lights-word'), target);
+      }
+      await board.locator(`[data-lights-word="${target}"]`).click();
+    }
+    assert.equal(await board.locator('button.is-lit').count(), 2);
+    if (round < 4) await page.locator('[data-lights-next]').click();
+  }
+  await page.locator('[data-lights-replay]').waitFor();
+}
+
 async function run() {
   const browser = await chromium.launch({
     channel: process.env.HSK_CHROMIUM_CHANNEL || 'chrome',
@@ -105,6 +217,9 @@ async function run() {
   try {
     const context = await browser.newContext(devices['iPhone 13']);
     context.setDefaultTimeout(8000);
+    await context.addInitScript(() => {
+      if (window.speechSynthesis) Object.defineProperty(window.speechSynthesis, 'getVoices', {value: () => []});
+    });
     const page = await context.newPage();
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
@@ -113,11 +228,11 @@ async function run() {
     const lobby = () => page.getByRole('button', { name: 'Sân chơi', exact: true }).click();
     const enter = game => page.locator(`[data-action="arcade-start"][data-id="${game}"]`).click();
     await lobby();
-    assert.equal(await page.locator('.arcade-card').count(), 4);
+    assert.equal(await page.locator('.arcade-card').count(), 8);
     if (process.env.HSK_ARCADE_SCREENSHOTS) {
       await page.locator('.arcade-lobby').screenshot({path: process.env.HSK_ARCADE_SCREENSHOTS + '/hsk1-san-choi.png'});
     }
-    for (const [name, play] of Object.entries({pinyin, strokes, pairs, flow})) {
+    for (const [name, play] of Object.entries({wind, echo, riddle, lights, pinyin, strokes, pairs, flow})) {
       await enter(name);
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
       if (name === 'pinyin') {
@@ -126,6 +241,9 @@ async function run() {
         if (process.env.HSK_ARCADE_SCREENSHOTS) {
           await page.locator('.arcade-main').screenshot({path: process.env.HSK_ARCADE_SCREENSHOTS + '/hsk1-sao-pinyin.png'});
         }
+      }
+      if (name === 'lights' && process.env.HSK_ARCADE_SCREENSHOTS) {
+        await page.locator('.arcade-main').screenshot({path: process.env.HSK_ARCADE_SCREENSHOTS + '/hsk1-ho-dom-dom.png'});
       }
       await play(page);
       await lobby();
@@ -136,6 +254,13 @@ async function run() {
     await lobby();
     await enter('pinyin');
     await page.locator('[data-pinyin-target]').first().waitFor();
+    await lobby();
+    for (const [name, selector] of Object.entries({wind:'[data-wind]', echo:'[data-echo-station]',
+      riddle:'[data-riddle-lock]', lights:'[data-lights-lake]'})) {
+      await enter(name);
+      await page.locator(selector).waitFor();
+      await lobby();
+    }
     assert.deepEqual(errors, []);
     await context.close();
 
@@ -159,7 +284,7 @@ async function run() {
     await fallbackPage.locator('[data-pinyin-launch]').click();
     await fallbackPage.waitForFunction(() => Number(document.querySelector('[data-pinyin-score]').textContent) > 0);
     await fallback.close();
-    console.log('Đạt kiểm thử Chromium cho bốn mini game, kỷ lục, ngoại tuyến và chế độ 2D khi WebGL không khả dụng.');
+    console.log('Đạt kiểm thử Chromium cho tám mini game, kỷ lục, ngoại tuyến và chế độ 2D khi WebGL không khả dụng.');
   } finally {
     await browser.close();
   }

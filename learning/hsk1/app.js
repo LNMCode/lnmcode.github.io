@@ -68,7 +68,7 @@ function home(){const st=E.stats(state),m=nextMission(),r=R[m.regionId],isActive
  ${oldMission?btn('resume','Tiếp tục lượt đang dở','button-text full mt8'):''}
  ${arcade?`<button class="arcade-home-link" data-action="nav" data-view="arcade">
    <span class="arcade-home-icon" aria-hidden="true">${icon('spark')}</span><span><strong>Sân chơi đèn lồng</strong>
-   <small>Viết nét, phóng sao, lật đèn và ghép câu</small></span>${icon('arrow')}</button>`:''}
+   <small>${Object.keys(arcade.games).length} trò luyện tiếng Trung</small></span>${icon('arrow')}</button>`:''}
  <div class="home-reminder"><div class="reminder-em">🧠</div><div><strong>${st.due?`${st.due} lượt luyện đang cần ôn`:'Bắt đầu ôn để tạo trí nhớ dài hạn'}</strong><p>Từ hay quên sẽ quay lại sớm hơn. Bạn không bị phạt khi nghỉ học.</p></div><button data-action="nav" data-view="review" aria-label="Mở ôn tập">${icon('arrow')}</button></div>
  <div class="section-title"><h2>Điểm dừng tiếp theo</h2><button class="link-button" data-action="nav" data-view="map">Xem bản đồ ${icon('arrow')}</button></div><button class="next-card" data-action="start-mission" data-id="${m.id}"><span class="next-emoji">${r.emoji}</span><span><small>${esc(r.name)} · Chặng ${m.step}</small><strong>${esc(D.adventureMissions?.[m.id]?.title||'Theo dấu đèn lồng')}</strong><span class="mini-wordchain">${m.wordIds.map(id=>hanzi(W[id].hanzi)).join(' · ')}</span></span>${icon('arrow')}</button>
  <div class="section-title"><h2>Học theo cách của bạn</h2><button class="link-button" data-action="nav" data-view="progress">Xem tiến độ</button></div><div class="feature-grid"><button class="feature-card" data-action="nav" data-view="words"><span class="feature-icon">🔤</span><b>Chữ gốc → từ ghép</b><small>Tra đủ 300 từ, xem từ cùng họ.</small></button><button class="feature-card" data-action="nav" data-view="reader"><span class="feature-icon">📖</span><b>Đọc hiểu theo chủ đề</b><small>Đọc câu trong ngữ cảnh, hiện Pinyin khi cần.</small></button></div>
@@ -86,7 +86,7 @@ function arcadeLobby() {
   }).join('');
   return frame(`<section class="arcade-lobby">
       <header class="arcade-lobby-title"><h1>Sân chơi đèn lồng</h1>
-        <p>Chọn một trò để luyện theo cách bạn thích.</p></header>
+        <p>Nghe, đọc, viết và vận dụng từ theo nhịp của bạn.</p></header>
       <div class="arcade-grid">${cards||'<p>Sân chơi chưa tải được. Hãy tải lại trang.</p>'}</div>
     </section>`, 'arcade');
 }
@@ -112,6 +112,9 @@ function mountArcade() {
       words: limit => arcade.words(E, state, limit),
       sentences: limit => arcade.sentences(E, state, limit),
       matchPinyin: E.matchPinyin,
+      voiceAvailable: () => Boolean(window.SpeechSynthesisUtterance && mandarinVoice()),
+      speak: (text, onError) => speak(text, false, onError),
+      stopSpeech: () => window.speechSynthesis?.cancel(),
       grade: (wordId, skill, quality) => E.grade(state, wordId, skill, quality, Date.now(),
         {exercise: `arcade:${id}`}),
       complete: score => E.recordArcade(state, id, score),
@@ -776,9 +779,9 @@ function voiceStatus(){
   if(!voice)return 'Thiết bị chưa cung cấp giọng Quan thoại cho trình duyệt.';
   return voice.localService?'Có giọng Quan thoại trên thiết bị.':'Giọng Quan thoại có thể cần kết nối mạng.';
 }
-function speak(text,notify=true){
+function speak(text,notify=true,onError){
   const voice=mandarinVoice();
-  if(!voice||!window.SpeechSynthesisUtterance){if(notify)toast(voiceStatus());return;}
+  if(!voice||!window.SpeechSynthesisUtterance){if(notify)toast(voiceStatus());return false;}
   try{
     speechSystem.cancel();
     const utterance=new SpeechSynthesisUtterance(text);
@@ -786,10 +789,13 @@ function speak(text,notify=true){
     utterance.lang=voice.lang;
     utterance.rate=.78;
     utterance.onerror=event=>{
-      if(notify&&!['canceled','interrupted'].includes(event.error))toast('Chưa phát được giọng Quan thoại. Hãy kiểm tra giọng đọc và kết nối mạng.');
+      if(['canceled','interrupted'].includes(event.error))return;
+      if(notify)toast('Chưa phát được giọng Quan thoại. Hãy kiểm tra giọng đọc và kết nối mạng.');
+      onError?.();
     };
     speechSystem.speak(utterance);
-  }catch(_error){if(notify)toast('Chưa phát được âm thanh trên thiết bị này.');}
+    return true;
+  }catch(_error){if(notify)toast('Chưa phát được âm thanh trên thiết bị này.');return false;}
 }
 speechSystem?.addEventListener?.('voiceschanged',()=>{
   const status=app.querySelector('[data-voice-status]');

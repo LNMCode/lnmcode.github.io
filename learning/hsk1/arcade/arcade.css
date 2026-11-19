@@ -80,6 +80,26 @@
   --terrain: #1a3a36;
   --shadow-tone: #172d2e;
 }
+.arcade-card-wind {
+  --tint: #9bcdfb;
+  --terrain: #263963;
+  --shadow-tone: #1f2a45;
+}
+.arcade-card-echo {
+  --tint: #81ead4;
+  --terrain: #193f3d;
+  --shadow-tone: #172e35;
+}
+.arcade-card-riddle {
+  --tint: #ffd895;
+  --terrain: #503927;
+  --shadow-tone: #34282e;
+}
+.arcade-card-lights {
+  --tint: #ddeba3;
+  --terrain: #33442e;
+  --shadow-tone: #202f31;
+}
 .arcade-card-art {
   position: relative;
   align-self: stretch;

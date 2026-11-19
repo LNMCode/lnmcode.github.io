@@ -1,0 +1,136 @@
+.lights-game {
+  display: grid;
+  gap: 13px;
+}
+.lights-game [hidden] {
+  display: none !important;
+}
+.lights-rule, .lights-status {
+  margin: 0;
+  color: var(--muted);
+}
+.lights-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.lights-hud {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: #d8ebb0;
+  font-size: .93rem;
+}
+.lights-score {
+  font-variant-numeric: tabular-nums;
+}
+.lights-clues {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style-position: inside;
+}
+.lights-clues li {
+  padding: 9px 10px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: #d0d7d3;
+  background: #1b2a2a;
+  border: 1px solid #49604e;
+  border-radius: 12px;
+  font-size: .91rem;
+}
+.lights-clues li[aria-current="step"] {
+  border-color: #c2e08e;
+  color: #f0f6ce;
+}
+.lights-clues li.is-found {
+  background: #314433;
+  border-color: #8bbb77;
+}
+.lights-lake {
+  isolation: isolate;
+  position: relative;
+  min-height: clamp(230px, 65vw, 310px);
+  overflow: hidden;
+  border: 1px solid #556e5b;
+  border-radius: 20px;
+  background:
+    repeating-radial-gradient(ellipse at 50% 110%, transparent 0 17px, #8ed0aa1c 18px, transparent 19px 35px),
+    radial-gradient(ellipse at 58% 26%, #294333, #132c30 54%, #101a25);
+}
+.lights-lake::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 45% 70%, #d5ff9c40, transparent 68%);
+  opacity: 0;
+  transition: opacity .35s ease;
+}
+.lights-lake[data-cleared]::after {
+  opacity: 1;
+}
+.lights-lake canvas, .lights-pads {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.lights-lake canvas {
+  pointer-events: none;
+  opacity: .68;
+}
+.lights-pad {
+  position: absolute;
+  top: var(--y);
+  left: var(--x);
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  min-width: 52px;
+  min-height: 52px;
+  max-width: 31%;
+  padding: 6px 8px;
+  transform: translate(-50%, -50%);
+  color: #f3ffd8;
+  border: 1px solid #adcf80;
+  border-radius: 48% 41% 47% 34%;
+  background: linear-gradient(145deg, #476941, #223f33);
+  box-shadow: 0 3px 0 #13241e, 0 0 17px #9df08643;
+  font: 800 clamp(1rem, 4vw, 1.35rem) var(--zh);
+  overflow-wrap: anywhere;
+}
+.lights-pad span {
+  animation: lights-hover 2.3s ease-in-out var(--phase) infinite;
+}
+.lights-pad:disabled.is-lit {
+  opacity: 1;
+  background: linear-gradient(125deg, #f0ffad, #d6e987);
+  color: #1d2a16;
+  box-shadow: 0 0 22px #e6ff8fb8;
+}
+.lights-pad.is-hinted {
+  outline: 2px dashed #fce7a2;
+  outline-offset: 4px;
+}
+.lights-status[data-tone="good"] { color: #d7f4ab; }
+.lights-status[data-tone="miss"] { color: #ffcf9c; }
+.lights-timer {
+  width: 100%;
+  accent-color: #d2e68e;
+}
+.lights-actions .btn { flex: 1 1 130px; }
+@keyframes lights-hover {
+  50% { transform: translateY(-3px); }
+}
+.lights-lake[data-paused] .lights-pad span,
+.reduce-motion .lights-pad span {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lights-lake::after { transition: none; }
+  .lights-pad span { animation: none; }
+}

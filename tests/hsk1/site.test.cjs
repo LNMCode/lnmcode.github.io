@@ -12,7 +12,8 @@ const pages = [
 const artworks = ['./art/school.webp', './art/market.webp', './art/river.webp'];
 const arcade = ['catalog.js', 'visual.js', 'strokes.js', 'strokes-data.js', 'pinyin.js',
   'pairs.js', 'flow.js', 'arcade.css', 'memory-games.css', 'vendor/three.module.min.js',
-  'vendor/three.core.min.js'].map(name => './arcade/' + name);
+  'vendor/three.core.min.js', 'wind.js', 'echo.js', 'riddle.js', 'lights.js',
+  'wind.css', 'echo.css', 'riddle.css', 'lights.css'].map(name => './arcade/' + name);
 
 function localResource(base, reference) {
   const url = new URL(reference, base);

@@ -1,0 +1,198 @@
+.riddle-game {
+  display: grid;
+  gap: 12px;
+  --riddle-gold: #ffd58f;
+  --riddle-teal: #a5f1d7;
+  --riddle-rose: #ffc5a5;
+}
+
+.riddle-game [hidden] { display: none !important; }
+
+.riddle-hud {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--muted);
+  font-size: .86rem;
+}
+
+.riddle-hud b { color: var(--riddle-gold); }
+
+.riddle-vault {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  place-items: center;
+  gap: 13px;
+  min-height: 204px;
+  padding: 14px;
+  overflow: hidden;
+  border: 1px solid #796145;
+  border-radius: 22px;
+  background:
+    linear-gradient(116deg, #26202a8a, #121d28a3),
+    repeating-linear-gradient(132deg, #172839 0 9px, #142333 9px 18px);
+}
+
+.riddle-vault::before,
+.riddle-vault::after {
+  position: absolute;
+  z-index: -1;
+  inset: 10px;
+  content: '';
+  pointer-events: none;
+}
+
+.riddle-vault::before {
+  border: 1px solid #9b795d65;
+  border-radius: 14px;
+}
+
+.riddle-vault::after {
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 50%, #ffbc7952, transparent 68%);
+  opacity: 0;
+  transition: opacity .22s ease-out;
+}
+
+.riddle-vault.is-open::after { opacity: 1; }
+
+.riddle-plate {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 150px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, #9d765935, #111d26 67%);
+  box-shadow: 0 0 26px #10141c, inset 0 0 4px #b68961a0;
+}
+
+.riddle-ring {
+  position: absolute;
+  inset: 0;
+  border: 1px solid #a67b55;
+  border-radius: 50%;
+  background: repeating-conic-gradient(from 16deg, #ac825965 0deg 1deg, transparent 1deg 15deg);
+  -webkit-mask: radial-gradient(farthest-side, transparent 83%, #000 84%);
+  mask: radial-gradient(farthest-side, transparent 83%, #000 84%);
+  transition: transform .24s ease-out, filter .2s;
+}
+
+.riddle-ring-outer { transform: rotate(var(--riddle-onset-angle, 0deg)); }
+.riddle-ring-middle { inset: 13px; transform: rotate(var(--riddle-rime-angle, 0deg)); }
+.riddle-ring-inner { inset: 26px; transform: rotate(var(--riddle-tone-angle, 0deg)); }
+.riddle-vault.is-open .riddle-ring { filter: brightness(1.65); }
+
+.riddle-seal {
+  display: grid;
+  place-items: center;
+  width: 69px;
+  aspect-ratio: 1;
+  border: 1px solid #b3885b;
+  border-radius: 50%;
+  color: var(--riddle-gold);
+  background: #302520;
+  font-size: 2.4rem;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: inset 0 0 18px #e89f3550;
+}
+
+.riddle-vault.is-open .riddle-seal {
+  color: #3a240a;
+  background: var(--riddle-gold);
+  box-shadow: 0 0 24px #ffb96db8;
+  animation: riddle-unlock .45s ease-out both;
+}
+
+@keyframes riddle-unlock {
+  0% { transform: scale(.92); }
+  38% { transform: scale(1.16); }
+  100% { transform: scale(1); }
+}
+
+.riddle-lamps {
+  display: flex;
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.riddle-lamps li {
+  width: 9px;
+  height: 9px;
+  border: 1px solid #ae8d6a;
+  border-radius: 50%;
+  background: #3e2c23;
+}
+
+.riddle-lamps .is-lit {
+  border-color: var(--riddle-gold);
+  background: var(--riddle-gold);
+  box-shadow: 0 0 7px #e9aa56;
+}
+
+.riddle-clue {
+  display: grid;
+  gap: 3px;
+  padding: 11px 13px;
+  border-left: 3px solid #d6a562;
+  border-radius: 8px;
+  background: #392a2859;
+}
+
+.riddle-clue small { color: var(--riddle-gold); }
+.riddle-clue strong { font-size: 1.02rem; overflow-wrap: anywhere; }
+
+.riddle-form { display: grid; gap: 10px; }
+.riddle-form > p { color: var(--muted); font-size: .86rem; }
+.riddle-dials { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+
+.riddle-dials label {
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  align-items: start;
+  gap: 4px;
+  min-width: 0;
+  padding: 6px;
+  border: 1px solid #3a4d61;
+  border-radius: 10px;
+  color: #dce3ea;
+  background: #142334;
+  font-size: .78rem;
+}
+
+.riddle-dials select {
+  width: 100%;
+  min-height: 44px;
+  padding: 5px 2px;
+  border: 1px solid #597087;
+  border-radius: 7px;
+  color: #fff2d1;
+  background: #1e2e3c;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.riddle-dials select:disabled { opacity: 1; }
+.riddle-dials select:focus-visible { outline: 2px solid var(--riddle-gold); outline-offset: 1px; }
+.riddle-dials [data-state="matched"] { border-color: #72b69f; color: var(--riddle-teal); }
+.riddle-dials [data-state="missed"] { border-color: #b78072; color: var(--riddle-rose); }
+.riddle-dials [data-state="hint"] { border-color: #c29e64; color: var(--riddle-gold); }
+.riddle-dial-status { min-height: 1.27em; }
+.riddle-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.riddle-buttons .btn { flex: 1 1 130px; }
+.riddle-message { min-height: 1.4em; color: var(--riddle-gold); font-size: .91rem; }
+.riddle-message:empty { display: none; }
+
+.riddle-still .riddle-ring,
+.riddle-still .riddle-vault::after { transition: none; }
+.riddle-still .riddle-seal { animation: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .riddle-ring, .riddle-vault::after { transition: none; }
+  .riddle-vault.is-open .riddle-seal { animation: none; }
+}

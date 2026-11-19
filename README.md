@@ -4,6 +4,8 @@ Game học tiếng Trung bằng tiếng Việt với 300 mục từ HSK 1. Mỗi
 
 Mở **Sân chơi** để luyện Pinyin với **Sao Pinyin**, luyện thứ tự nét của 30 chữ với **Dấu Mực**, lật thẻ chữ và nghĩa trong **Đèn Đôi** hoặc ghép câu đưa thuyền qua sông trong **Dòng Chữ**. Các trò ưu tiên từ đã gặp và lưu kỷ lục cùng tiến độ trên thiết bị.
 
+Bốn trò khác gồm **Đường Gió** (đổi làn, tìm cổng đúng và bay lại với từ hay nhầm), **Trạm Vọng Âm** (dò sóng, nghe tiếng Quan thoại rồi ghi Pinyin), **Mật Mã Âm Tiết** (mở khóa bằng âm đầu, vần và thanh) và **Hồ Đom Đóm** (nhớ hai chữ theo thứ tự, có chế độ đua giờ tùy chọn). Trạm Vọng Âm dùng giọng của thiết bị; khi giọng Quan thoại không khả dụng, trò chuyển sang manh mối bằng nghĩa tiếng Việt.
+
 - [Mở trò chơi trên GitHub Pages](https://lnmcode.github.io/learning/hsk1/) sau khi workflow `Deploy GitHub Pages` chạy thành công.
 - Trên iPhone, mở link trong Safari. Để thêm biểu tượng vào màn hình chính, chọn **Chia sẻ → Thêm vào MH chính**. Mở game một lần khi có mạng và kiểm tra trạng thái ngoại tuyến trong **Cài đặt** trước khi ngắt mạng.
 - Để mang tiến độ từ bản ZIP sang website hoặc đổi thiết bị, mở **Cài đặt → Sao lưu** trong bản cũ và lưu tệp JSON. Sau đó mở **Khôi phục** trong bản mới, chọn tệp và xác nhận thay thế. Hai bản có vùng lưu trữ trình duyệt riêng.
